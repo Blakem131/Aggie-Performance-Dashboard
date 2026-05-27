@@ -6,16 +6,14 @@ import plotly.express as px
 import plotly.graph_objects as go
 import base64
 import os
-from datetime import datetime, timedelta
 
 # -----------------------------------------------------------------------------
-# LIVE CATAPULT API AUTHORIZATION CREDENTIALS
+# DIRECT UNBLOCKED DROPBOX PERFORMANCE FEED
 # -----------------------------------------------------------------------------
-CATAPULT_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6ImU3NzY0MDAzODU1YjlmZWNlOGMxYzIyY2U0YWIxNjlkIn0.eyJhdWQiOiI0NjFiMTExMS02ZjdhLTRkYmItOWQyOS0yMzAzOWZlMjI4OGUiLCJqdGkiOiIxNjI1ZDI2NTY5OTEyNmRjOTc5YTE0ZWRjMjcxY2UwNWMzOGY3NmU2YzUzYWYxNmQ4Y2VlNzgyMmYxNGZjY2FiZjE2ZjMxMDRmZDg5MWNiMSIsImlhdCI6MTc3OTkxNzk0NC4yMTgxNDgsIm5iZiI6MTc3OTkxNzk0NC4yMTgxNSwiZXhwIjo0OTMzNTE3OTQ0LjIwNzUwNiwic3ViIjoiYzA1ZDk3YTgtMjQ4YS00ZDhmLWJhODgtZjZmMjI3ZTk2NTUzIiwic2NvcGVzIjpbImNvbm5lY3QiXSwiaXNzIjoiaHR0cHM6Ly9iYWNrZW5kLXVzLm9wZW5maWVsZC5jYXRhcHVsdHNwb3J0cy5jb20iLCJjb20uY2F0YXB1bHRzcG9ydHMiOnsib3BlbmZpZWxkIjp7ImN1c3RvbWVycyI6W3sicmVsYXRpb24iOiJhdXRoIiwiaWQiOjcyfV19fX0.EoTbNGNj12m16S-yzT3sQm_u3YVdaCdiUKL9rbw47SsrkytaVqim9uzVXEJstg2VG5R9-i2dUPcg17EZ6B5dDCi41r_a7A_vDI5T-zUQsaeKqzENhIxPT39Qb_mpiLiEaY8g1mCWIBJFbuPsAbm3mMrWWTI-DRT5ZCLWR3A5tsWhn4lG4zNABv9FsYE_EOkhZouFn8tJddEKmmygfAe8HPcDWLpwSWDoFqqYlDiTU3V9QIY83wX4BUVTzx-5I6CgqzCmDphuA0JvRSNuBQnxoeYecTliRSh5cVmt9WbbnkGtStDB_--ckD7Rh4lC7TT6vcs-ea3paB2o85GHr1Bl5ofwFp9ZjRSInWuRJHplGFRhC36HtdBS9R31QQl3u7nPS7jSAfMNfdnuNQsI2Vz0I2imuT6-KU3OBCtT_AnLYMsoAvEhRqCaC37fs7O5jl4WMw8QKqckVNLI6dyaOrvOyMuWcHKBrcrjAX9pw9BY1qYRyLlJXeWOfxJJ8nrZgybCCU__CFNaIIluTu9W1CIk8_m8td-NxV34MnSxfgfVL-bvzPV5ZvM6G9rsJZ1MoKi-5yvRmR1PzNwk2mGLJToy1zvjEga31sNYzldWcVVcb-HX9rMM3C_nKTCP7rtEBWOmIN-GAgLfsOXUvmKG9bWGifViGp8N1KWtfO0paKSwyVw"
-BASE_URL = "https://backend-us.openfield.catapultsports.com/api/v1"
+DROPBOX_EXCEL_URL = "https://www.dropbox.com/scl/fi/mnt2lceqv1wf3flosu1qa/GPS-Summer-2026.xlsx?rlkey=bza5zug85wr78kiiuflv8ptld&st=3k2u375y&dl=1"
 
 # -----------------------------------------------------------------------------
-# HIGH-END ONYX FACILITY BACKGROUND GRAPHICS OVERLAY
+# PREMIUM AGGIE ONYX DARK MODE STYLING & IMAGE RENDERING
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Texas A&M Football Performance Portal", layout="wide")
 
@@ -62,53 +60,61 @@ if logo_base64:
     st.markdown(f'<img src="data:image/png;base64,{logo_base64}" class="aggie-floating-logo">', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# LIVE CATAPULT CLOUD DATA EXTRACTION ENGINE
+# AUTOMATED MASTER RECOVERY & CONVERSION ENGINE
 # -----------------------------------------------------------------------------
-@st.cache_data(ttl=120)  # Automatically checks Catapult API for updates every 2 minutes
-def pull_catapult_live_roster(token):
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
+@st.cache_data(ttl=30)
+def load_dropbox_raw_export(url):
     try:
-        # Step 1: Query the Catapult server for active training sessions
-        session_url = f"{BASE_URL}/activities"
-        resp = requests.get(session_url, headers=headers, timeout=10)
+        # Step 1: Skip the 9-row metadata block at the top of the Catapult sheet
+        df = pd.read_excel(url, skiprows=9)
+        df.columns = [str(c).strip() for c in df.columns]
         
-        if resp.status_code == 200:
-            activities = resp.json()
-            if activities and len(activities) > 0:
-                # Target the latest practice activity ID
-                latest_activity_id = activities[0].get("id")
+        # Step 2: Drop all individual drill rows and restrict layout to master summaries
+        if 'Period Name' in df.columns:
+            df = df[df['Period Name'].str.lower().str.strip() == 'session']
+            
+        # Step 3: Align target headers perfectly
+        rename_map = {}
+        for col in df.columns:
+            c_low = col.lower()
+            if c_low in ['player name', 'name', 'athlete']: rename_map[col] = 'Player'
+            elif c_low in ['position name', 'position', 'pos']: rename_map[col] = 'Position'
+            elif 'total distance' in c_low: rename_map[col] = 'Total Distance'
+            elif 'explosive yardage' in c_low or 'explosive yardage (fsu)' in c_low: rename_map[col] = 'Explosive Yardage'
+            elif 'total player load' in c_low or c_low == 'player load': rename_map[col] = 'Player Load'
+            elif 'max speed' in c_low: rename_map[col] = 'Max Speed'
                 
-                # Step 2: Grab full summary metrics for all players in this activity
-                metrics_url = f"{BASE_URL}/activities/{latest_activity_id}/player-summaries"
-                m_resp = requests.get(metrics_url, headers=headers, timeout=10)
+        df = df.rename(columns=rename_map)
+        
+        if 'Player' not in df.columns:
+            return None
+            
+        # Step 4: Map standard team groupings
+        def assign_tier(pos_val):
+            p = str(pos_val).upper().strip()
+            if any(x in p for x in ['WR', 'CB', 'RB', 'DB', 'SAF', 'SKILL', 'CORNER']): return 'Skill'
+            elif any(x in p for x in ['TE', 'LB', 'QB', 'MID', 'INSIDE', 'DE']): return 'Mid'
+            else: return 'Big'
+            
+        df['Position Group'] = df['Position'].apply(assign_tier)
+        
+        # Step 5: Convert metric fields to floating configurations and fix unit systems
+        numeric_cols = ['Total Distance', 'Explosive Yardage', 'Player Load', 'Max Speed']
+        for nc in numeric_cols:
+            if nc in df.columns:
+                df[nc] = pd.to_numeric(df[nc], errors='coerce').fillna(0.0)
+            else:
+                df[nc] = 0.0
                 
-                if m_resp.status_code == 200:
-                    raw_players = m_resp.json()
-                    records = []
-                    for p in raw_players:
-                        # Extract and parse raw telemetry variables
-                        pos = p.get("position", "Skill")
-                        records.append({
-                            'Player': f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
-                            'Position': pos,
-                            'Total Distance': round(float(p.get('total_distance', 0)) * 1.09361, 1), # Meter to Yard adjustment
-                            'Explosive Yardage': round(float(p.get('explosive_distance', 0)) * 1.09361, 1),
-                            'Player Load': round(float(p.get('player_load', 0)), 1),
-                            'Max Speed': round(float(p.get('max_velocity', 0)) * 2.23694, 1) # M/s to Mph adjustment
-                        })
-                    
-                    if records:
-                        df = pd.DataFrame(records)
-                        def assign_tier(pos_val):
-                            p = str(pos_val).upper()
-                            if any(x in p for x in ['WR', 'CB', 'RB', 'DB', 'SAF', 'SKILL']): return 'Skill'
-                            elif any(x in p for x in ['TE', 'LB', 'QB', 'MID']): return 'Mid'
-                            else: return 'Big'
-                        df['Position Group'] = df['Position'].apply(assign_tier)
-                        return df
+        # Metric system safety calibrations (convert meters to yards if needed)
+        if df['Total Distance'].mean() < 2500:
+            df['Total Distance'] = (df['Total Distance'] * 1.09361).round(1)
+            df['Explosive Yardage'] = (df['Explosive Yardage'] * 1.09361).round(1)
+            
+        df = df[df['Player'].notna() & ~df['Player'].str.lower().str.contains('total|average|mean', na=False)]
+        return df
     except:
-        pass
-    return None
+        return None
 
 # --- BACKGROUND HAWKINS CLOUD DOWNLINK ---
 @st.cache_data(ttl=300)
@@ -137,19 +143,18 @@ def fetch_hawkins_cloud():
     return None
 
 # -----------------------------------------------------------------------------
-# MASTER PIPELINE RESOLUTION BLOCK
+# PRODUCTION INTERFACE ROUTER
 # -----------------------------------------------------------------------------
-st.sidebar.title("Aggie System Control")
+st.sidebar.title("Aggie Command Center")
 
-# Download directly from Catapult Cloud Link
-gps_df = pull_catapult_live_roster(CATAPULT_TOKEN)
+gps_df = load_dropbox_raw_export(DROPBOX_EXCEL_URL)
 hawkins_df = fetch_hawkins_cloud()
 
-if gps_df is not None:
-    st.sidebar.success("🚀 LIVE CATAPULT API: CONNECTED")
+if gps_df is not None and len(gps_df) > 0:
+    st.sidebar.success(f"⚡ Live Dropbox Sync: ACTIVE\n({len(gps_df)} Athletes Loaded)")
 else:
-    st.sidebar.warning("🔒 API Query Active. Using internal analytics workspace frame.")
-    # Standard engineering backup row arrays if Catapult server is empty between practices
+    st.sidebar.error("⚠️ Sync Interrupted. Re-verifying file path parsing variables...")
+    # Framework layout fail-safes
     names = ['Bryce Anderson', 'Terry Bussey', 'Mario Craver', 'Julian Humphrey', 'Jamarion Morrow', 'Marcel Reed', 'Rueben Owens', 'Trovon Baugh', 'DJ Hicks', 'Taurean York']
     gps_df = pd.DataFrame({
         'Player': names, 'Position': ['SAF', 'WR', 'WR', 'CB', 'RB', 'QB', 'RB', 'OL', 'DL', 'LB'],
@@ -175,7 +180,7 @@ gps_df['mRSI'] = gps_df['mRSI'].fillna(0.60).round(2)
 gps_df['ACWR'] = np.random.uniform(0.85, 1.65, len(gps_df)).round(2)
 gps_df['Jump_Delta_%'] = np.random.uniform(-15.0, 15.0, len(gps_df)).round(1)
 
-# Generate Historical Data Matrix
+# Generate Dynamic Progressions Map
 dates_5w = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"]
 history_records = []
 for idx, row in gps_df.iterrows():
@@ -189,7 +194,6 @@ for idx, row in gps_df.iterrows():
         })
 history_df = pd.DataFrame(history_records)
 
-# Navigation Selector Menu View Router
 page = st.sidebar.radio("Select Portal Dashboard Module View:", [
     "Page 1: Daily Team Monitor",
     "Page 2: Positional Breakdowns",
@@ -201,25 +205,25 @@ page = st.sidebar.radio("Select Portal Dashboard Module View:", [
 # --- PAGE 1: DAILY TEAM MONITOR ---
 if page == "Page 1: Daily Team Monitor":
     st.title("👍 Texas A&M Football Performance Hub")
-    st.markdown("### Direct Catapult API Cloud Integration | Active Practice Statistics")
+    st.markdown("### Organizational Summer Data Dashboard | Active Performance Trends")
     st.divider()
     
     pos_opts = list(gps_df['Position Group'].unique())
     selected_groups = st.multiselect("Filter Roster Segmentations:", pos_opts, default=pos_opts)
     display_df = gps_df[gps_df['Position Group'].isin(selected_groups)]
     
-    st.dataframe(display_df[['Player', 'Position', 'Position Group', 'Total Distance', 'Explosive Yardage', 'Player Load', 'Jump Height', 'mRSI', 'ACWR']], use_container_width=True, hide_index=True)
+    st.dataframe(display_df[['Player', 'Position', 'Position Group', 'Total Distance', 'Explosive Yardage', 'Player Load', 'Jump Height', 'mRSI', 'ACWR']].sort_values(by='Total Distance', ascending=False), use_container_width=True, hide_index=True)
     
     st.divider()
     st.subheader("📊 Session Fluctuation Trends & Neuromuscular Movement Alerts")
     
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown("#### 🚀 Top 10 Weekly Improvers (Jump Height)")
+        st.markdown("#### 🚀 Top Weekly Improvers (Jump Height)")
         t10 = gps_df.sort_values(by='Jump_Delta_%', ascending=False).head(10)
         st.dataframe(t10[['Player', 'Position', 'Jump Height', 'Jump_Delta_%']].rename(columns={'Jump_Delta_%':'Weekly Change %'}), hide_index=True, use_container_width=True)
     with c2:
-        st.markdown("#### 📉 Bottom 10 Weekly Declines (Jump Height)")
+        st.markdown("#### 📉 Bottom Weekly Declines (Jump Height)")
         b10 = gps_df.sort_values(by='Jump_Delta_%', ascending=True).head(10)
         st.dataframe(b10[['Player', 'Position', 'Jump Height', 'Jump_Delta_%']].rename(columns={'Jump_Delta_%':'Weekly Change %'}), hide_index=True, use_container_width=True)
     with c3:
@@ -236,7 +240,7 @@ elif page == "Page 2: Positional Breakdowns":
     for group in ['Skill', 'Mid', 'Big']:
         st.markdown(f"## **{group.upper()} UNIT LEADERBOARD**")
         g_df = gps_df[gps_df['Position Group'] == group]
-        mean_dist = int(g_df['Total Distance'].mean())
+        mean_dist = int(g_df['Total Distance'].mean()) if len(g_df) > 0 else 1
         
         leader_view = g_df[['Player', 'Position', 'Total Distance', 'Explosive Yardage', 'Max Speed', 'mRSI']].copy()
         leader_view['Load Variance vs Unit'] = leader_view['Total Distance'].apply(lambda x: f"{x - mean_dist:+.0f} yds")
@@ -256,11 +260,11 @@ elif page == "Page 3: Individual Athlete Diagnostic":
     with col1:
         st.subheader("🕸️ Performance Capacity Spider Chart")
         categories = ['Velocity (Max Speed)', 'Power (Explosive Yds)', 'Force (mRSI)', 'Capacity (Player Load)', 'Vertical (Jump Height)']
-        s_vel = min(100, int((p_row['Max Speed'] / 23.0) * 100))
-        s_pow = min(100, int((p_row['Explosive Yardage'] / 800.0) * 100))
-        s_for = min(100, int((p_row['mRSI'] / 0.80) * 100))
-        s_cap = min(100, int((p_row['Player Load'] / 650.0) * 100))
-        s_vrt = min(100, int((p_row['Jump Height'] / 20.0) * 100))
+        s_vel = min(100, int((p_row['Max Speed'] / 23.0) * 100)) if p_row['Max Speed'] > 0 else 0
+        s_pow = min(100, int((p_row['Explosive Yardage'] / 800.0) * 100)) if p_row['Explosive Yardage'] > 0 else 0
+        s_for = min(100, int((p_row['mRSI'] / 0.80) * 100)) if p_row['mRSI'] > 0 else 0
+        s_cap = min(100, int((p_row['Player Load'] / 650.0) * 100)) if p_row['Player Load'] > 0 else 0
+        s_vrt = min(100, int((p_row['Jump Height'] / 20.0) * 100)) if p_row['Jump Height'] > 0 else 0
         
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(
@@ -280,7 +284,7 @@ elif page == "Page 3: Individual Athlete Diagnostic":
         
         if p_row['ACWR'] >= 1.5: st.error(f"❌ **FATIGUE RED FLAG:** ACWR is dangerously elevated at {p_row['ACWR']:.2f}")
         else: st.success("✅ **LOAD RATIO CLEAR:** Workload safely integrated inside recovery limits.")
-        st.info("👉 **Coaching Optimization Mandate:** Maintain mechanical speed exposure loops.")
+        st.info("👉 **Coaching Optimization Mandate:** Maintain speed exposures.")
 
     st.divider()
     st.subheader("📈 Click Drop-Down Panels Below to Expand Historical Progression Trends")
