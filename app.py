@@ -5,7 +5,7 @@ import base64
 import os
 
 # -----------------------------------------------------------------------------
-# HARDCODED ROSTER POINT OF TRUTH
+# FIXED CORE ROSTER ENGINE CONTEXT
 # -----------------------------------------------------------------------------
 ROSTER_FILE = "Name KEy Football APP.csv"
 
@@ -57,20 +57,22 @@ if logo_base64:
     st.markdown(f'<img src="data:image/png;base64,{logo_base64}" class="aggie-floating-logo">', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# MASTER DATA ALIGNMENT PARSER
+# MASTER DATA SYSTEM INITIALIZATION
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_base_roster():
     if not os.path.exists(ROSTER_FILE):
         return None
-    df = pd.read_csv(ROSTER_FILE)
-    df.columns = [str(c).strip() for c in df.columns]
-    df = df.rename(columns={'Name': 'Player', 'POS': 'Position', 'Skill': 'Position Group'})
-    return df[['Player', 'Position', 'Position Group']]
+    try:
+        df = pd.read_csv(ROSTER_FILE)
+        df.columns = [str(c).strip() for c in df.columns]
+        df = df.rename(columns={'Name': 'Player', 'POS': 'Position', 'Skill': 'Position Group'})
+        return df[['Player', 'Position', 'Position Group']]
+    except:
+        return None
 
 def process_uploaded_metrics(file_source):
     try:
-        # Scan the first 25 rows to automatically clear the metadata header block
         if file_source.name.endswith('.csv'):
             df_raw = pd.read_csv(file_source, header=None, nrows=25)
         else:
@@ -83,7 +85,6 @@ def process_uploaded_metrics(file_source):
                 header_idx = idx
                 break
                 
-        # Reload file based on the dynamic header discovery index
         file_source.seek(0)
         if file_source.name.endswith('.csv'):
             df = pd.read_csv(file_source, skiprows=header_idx)
@@ -92,7 +93,6 @@ def process_uploaded_metrics(file_source):
             
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Only parse the master 'session' split rows to clear out raw drill duplicates
         if 'Period Name' in df.columns:
             df = df[df['Period Name'].str.lower().str.strip() == 'session']
             
@@ -107,7 +107,6 @@ def process_uploaded_metrics(file_source):
             
         df = df.rename(columns=rename_map)
         
-        # Convert text blocks safely to numerical values
         numeric_cols = ['Total Distance', 'Explosive Yardage', 'Player Load', 'Max Speed']
         for nc in numeric_cols:
             if nc in df.columns:
@@ -115,7 +114,6 @@ def process_uploaded_metrics(file_source):
             else:
                 df[nc] = 0.0
                 
-        # Automatically adjust metric measurements (meters) to target football terms (yards)
         if df['Total Distance'].mean() < 2500 and df['Total Distance'].mean() > 0:
             df['Total Distance'] = (df['Total Distance'] * 1.09361).round(1)
             df['Explosive Yardage'] = (df['Explosive Yardage'] * 1.09361).round(1)
@@ -125,7 +123,7 @@ def process_uploaded_metrics(file_source):
         return None
 
 # -----------------------------------------------------------------------------
-# CONTROL CONTROL PIPELINE INTERFACE
+# MAIN RE-ENGINEERED EXECUTION FLOW
 # -----------------------------------------------------------------------------
 st.sidebar.title("Aggie System Control")
 
@@ -135,28 +133,34 @@ if master_roster is None:
     st.sidebar.error(f"⚠️ Master file '{ROSTER_FILE}' not detected inside your core repository.")
     st.stop()
 
-# Interactive file drops interface
+# GUARANTEE: Initialize a safe backup dataframe layout immediately so it CANNOT be undefined
+gps_df = master_roster.copy()
+for col in ['Total Distance', 'Explosive Yardage', 'Player Load', 'Max Speed']:
+    gps_df[col] = 0.0
+
 uploaded_session = st.sidebar.file_uploader("Upload Daily Session Report:", type=["csv", "xlsx"])
 
 if uploaded_session is not None:
     session_metrics = process_uploaded_metrics(uploaded_session)
     if session_metrics is not None and len(session_metrics) > 0:
-        # Securely merge parsed values straight onto your 106-athlete baseline map
-        master_roster['Match_Key'] = master_roster['Player'].astype(str).str.strip().str.upper()
+        # Perform the merge directly onto the initialized framework safely
+        gps_df['Match_Key'] = gps_df['Player'].astype(str).str.strip().str.upper()
         session_metrics['Match_Key'] = session_metrics['Player'].astype(str).str.strip().str.upper()
         
-        gps_df = master_roster.merge(session_metrics[['Match_Key', 'Total Distance', 'Explosive Yardage', 'Player Load', 'Max Speed']], on='Match_Key', how='left')
+        # Overwrite fallback tracking fields with real telemetry safely
+        merged_df = master_roster.merge(session_metrics[['Match_Key', 'Total Distance', 'Explosive Yardage', 'Player Load', 'Max Speed']], on=None, left_on=gps_df['Match_Key'], right_on=session_metrics['Match_Key'], how='left')
+        
+        # Clean up transient column structures generated by pandas join paths
+        gps_df['Total Distance'] = merged_df['Total Distance'].fillna(0.0)
+        gps_df['Explosive Yardage'] = merged_df['Explosive Yardage'].fillna(0.0)
+        gps_df['Player Load'] = merged_df['Player Load'].fillna(0.0)
+        gps_df['Max Speed'] = merged_df['Max Speed'].fillna(0.0)
+        
         st.sidebar.success(f"⚡ Session Applied: {len(session_metrics)} Athletes Synced")
     else:
-        st.sidebar.error("❌ Data Parsing Timeout. Verify file structure variables.")
-        uploaded_session = None
-else:
-    # Load zeroed frameworks out of the box if no session file has been dropped yet
-    gps_df = master_roster.copy()
-    for col in ['Total Distance', 'Explosive Yardage', 'Player Load', 'Max Speed']:
-        gps_df[col] = 0.0
+        st.sidebar.error("⚠️ Formatting Warning: File parsed as fallback layout framework. Check column alignments below.")
 
-# Fill out target metric defaults
+# Fill out target metrics fields layout structures to block NameErrors completely
 gps_df['Total Distance'] = gps_df['Total Distance'].fillna(0.0)
 gps_df['Explosive Yardage'] = gps_df['Explosive Yardage'].fillna(0.0)
 gps_df['Player Load'] = gps_df['Player Load'].fillna(0.0)
@@ -164,7 +168,7 @@ gps_df['Max Speed'] = gps_df['Max Speed'].fillna(0.0)
 gps_df['Jump Height'] = 15.4
 gps_df['mRSI'] = 0.61
 
-# Generate Dynamic Progression Charts Maps
+# Navigation Interface Page Elements Router
 page = st.sidebar.radio("Select Portal Dashboard Module View:", [
     "Page 1: Daily Team Monitor",
     "Page 2: Positional Breakdowns"
