@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 # -----------------------------------------------------------------------------
 # PREMIUM AGGIE ONYX DARK MODE STYLING & IMAGE RENDERING
-# -----------------------------------------------------------------------------
+#EXCEL_CLOUD_URL = "https://tamuath.sharepoint.com/:x:/r/sites/teams-FootballStrength/_layouts/15/Doc.aspx?sourcedoc=%7B4D6F8F87-9B29-46A8-8913-3E84D2F19DF5%7D&file=GPS%20Summer%202026.xlsx&download=1" -----------------------------------------------------------------------------
 st.set_page_config(page_title="Texas A&M Football Performance Portal", layout="wide")
 
 # Injecting professional custom CSS styling variables to overhaul visual layers
