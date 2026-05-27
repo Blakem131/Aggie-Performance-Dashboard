@@ -60,26 +60,36 @@ if logo_base64:
     st.markdown(f'<img src="data:image/png;base64,{logo_base64}" class="aggie-floating-logo">', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# AUTOMATED MASTER RECOVERY & CONVERSION ENGINE
+# DYNAMIC FIELD SCANNING & ENGINE
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=30)
 def load_dropbox_raw_export(url):
     try:
-        # Step 1: Skip the 9-row metadata block at the top of the Catapult sheet
-        df = pd.read_excel(url, skiprows=9)
+        # Step 1: Read the raw sheet to dynamically locate where Catapult's headers begin
+        df_raw = pd.read_excel(url, header=None, nrows=25)
+        
+        header_idx = 0
+        for idx, row in df_raw.iterrows():
+            row_vals = [str(x).lower().strip() for x in row.dropna().values]
+            if 'player name' in row_vals or 'player' in row_vals:
+                header_idx = idx
+                break
+        
+        # Step 2: Reload the sheet using the dynamically discovered header row anchor
+        df = pd.read_excel(url, skiprows=header_idx)
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Step 2: Drop all individual drill rows and restrict layout to master summaries
+        # Step 3: Filter for the main master split row to avoid duplicate drill rows
         if 'Period Name' in df.columns:
             df = df[df['Period Name'].str.lower().str.strip() == 'session']
             
-        # Step 3: Align target headers perfectly
+        # Step 4: Map core telemetry metrics
         rename_map = {}
         for col in df.columns:
             c_low = col.lower()
-            if c_low in ['player name', 'name', 'athlete']: rename_map[col] = 'Player'
+            if c_low in ['player name', 'name', 'athlete', 'player']: rename_map[col] = 'Player'
             elif c_low in ['position name', 'position', 'pos']: rename_map[col] = 'Position'
-            elif 'total distance' in c_low: rename_map[col] = 'Total Distance'
+            elif 'total distance' in c_low or (c_low == 'distance' and 'band' not in c_low): rename_map[col] = 'Total Distance'
             elif 'explosive yardage' in c_low or 'explosive yardage (fsu)' in c_low: rename_map[col] = 'Explosive Yardage'
             elif 'total player load' in c_low or c_low == 'player load': rename_map[col] = 'Player Load'
             elif 'max speed' in c_low: rename_map[col] = 'Max Speed'
@@ -89,7 +99,7 @@ def load_dropbox_raw_export(url):
         if 'Player' not in df.columns:
             return None
             
-        # Step 4: Map standard team groupings
+        # Step 5: Assign standard positional group tiers
         def assign_tier(pos_val):
             p = str(pos_val).upper().strip()
             if any(x in p for x in ['WR', 'CB', 'RB', 'DB', 'SAF', 'SKILL', 'CORNER']): return 'Skill'
@@ -98,7 +108,6 @@ def load_dropbox_raw_export(url):
             
         df['Position Group'] = df['Position'].apply(assign_tier)
         
-        # Step 5: Convert metric fields to floating configurations and fix unit systems
         numeric_cols = ['Total Distance', 'Explosive Yardage', 'Player Load', 'Max Speed']
         for nc in numeric_cols:
             if nc in df.columns:
@@ -106,7 +115,7 @@ def load_dropbox_raw_export(url):
             else:
                 df[nc] = 0.0
                 
-        # Metric system safety calibrations (convert meters to yards if needed)
+        # Unit correction (convert meters to yards if Catapult exported raw metric values)
         if df['Total Distance'].mean() < 2500:
             df['Total Distance'] = (df['Total Distance'] * 1.09361).round(1)
             df['Explosive Yardage'] = (df['Explosive Yardage'] * 1.09361).round(1)
@@ -143,9 +152,9 @@ def fetch_hawkins_cloud():
     return None
 
 # -----------------------------------------------------------------------------
-# PRODUCTION INTERFACE ROUTER
+# MASTER SELECTION PIPELINE
 # -----------------------------------------------------------------------------
-st.sidebar.title("Aggie Command Center")
+st.sidebar.title("Aggie System Control")
 
 gps_df = load_dropbox_raw_export(DROPBOX_EXCEL_URL)
 hawkins_df = fetch_hawkins_cloud()
@@ -154,7 +163,6 @@ if gps_df is not None and len(gps_df) > 0:
     st.sidebar.success(f"⚡ Live Dropbox Sync: ACTIVE\n({len(gps_df)} Athletes Loaded)")
 else:
     st.sidebar.error("⚠️ Sync Interrupted. Re-verifying file path parsing variables...")
-    # Framework layout fail-safes
     names = ['Bryce Anderson', 'Terry Bussey', 'Mario Craver', 'Julian Humphrey', 'Jamarion Morrow', 'Marcel Reed', 'Rueben Owens', 'Trovon Baugh', 'DJ Hicks', 'Taurean York']
     gps_df = pd.DataFrame({
         'Player': names, 'Position': ['SAF', 'WR', 'WR', 'CB', 'RB', 'QB', 'RB', 'OL', 'DL', 'LB'],
