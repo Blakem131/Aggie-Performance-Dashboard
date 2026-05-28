@@ -6,10 +6,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # -----------------------------------------------------------------------------
-# CORE CONFIGURATION FILE TARGETS (LOCKED TO YOUR EXACT NAMING)
+# CORE CONFIGURATION FILE TARGETS
 # -----------------------------------------------------------------------------
 ROSTER_FILE = "Name KEy Football APP.csv"
-DATABASE_FILE = "Aggie Database.xlsx"
+DATABASE_FILE = "Aggie_Master_Database.xlsx"
 
 # -----------------------------------------------------------------------------
 # EXECUTIVE AGGIE ONYX STYLE DIRECTIVES
@@ -39,7 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# MASTER SAFE DATA PARSING LOADER
+# MASTER DATA PARSING LOADER
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_base_roster():
@@ -54,7 +54,7 @@ def load_base_roster():
     except:
         return None
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=10)
 def load_central_sheet_tab(xl_file, sheet_name, target_cols):
     try:
         if sheet_name not in xl_file.sheet_names:
@@ -92,7 +92,7 @@ def load_central_sheet_tab(xl_file, sheet_name, target_cols):
         return pd.DataFrame()
 
 # -----------------------------------------------------------------------------
-# COORDINATE MASTER ROUTINES PIPELINE
+# COORDINATE MAIN ROUTINES PIPELINE
 # -----------------------------------------------------------------------------
 st.sidebar.title("Aggie Portal Control")
 
@@ -101,7 +101,6 @@ if master_roster is None:
     st.sidebar.error(f"⚠️ Roster base mapping '{ROSTER_FILE}' not found.")
     st.stop()
 
-# Core Data Vault Column Definitions
 gps_cols = ['Total Distance (y)', 'Total Player Load', 'Player Load Per Minute', 'IMA Total', 'Explosive Yardage', 'Max Speed (mph)', 'Max Vel (% Max)']
 perch_cols = ['Mean Velocity (m/s)', 'Peak Velocity (m/s)', 'Peak Power (W)']
 nord_cols = ['Max Left Force (N)', 'Max Right Force (N)', 'Total Force (N)', 'Imbalance (%)']
@@ -115,21 +114,19 @@ if os.path.exists(DATABASE_FILE):
     try:
         xl = pd.ExcelFile(DATABASE_FILE)
         
-        # Pure Hardcoded Sheet Mappings From Your Specifications
         df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
         df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
         df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
         df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
         df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
         
-        # Build selection menu strictly off unique values in the Date column
-        all_logged_dates = []
+        # Simple, non-breaking check for any dates in the file
         for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
             if not current_df.empty and 'Date' in current_df.columns:
-                all_logged_dates.extend(current_df['Date'].dropna().unique().tolist())
+                unique_dates.extend(current_df['Date'].dropna().unique().tolist())
                 
-        unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
-        if "Manual Entry" in unique_dates: unique_dates.remove("Manual Entry")
+        unique_dates = list(set([str(d).strip() for d in unique_dates if str(d).strip() != "Manual Entry"]))
+        unique_dates = sorted(unique_dates, reverse=True)
     except:
         pass
 
@@ -140,7 +137,7 @@ else:
     st.sidebar.warning("⚠️ Syncing data elements... Dashboard will populate shortly.")
     df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-# Combine separate technology sheets onto your master roster canvas map
+# Clean merge step matching original behavior
 working_df = master_roster.copy()
 
 def slice_and_merge(base_df, source_df, cols, date_val):
@@ -166,7 +163,7 @@ for metric in all_metrics:
     else:
         working_df[metric] = 0.0
 
-# 5-Page Dashboard Navigation Selector
+# Navigation Panel Options
 page = st.sidebar.radio("Select Portal Dashboard Module View:", [
     "Page 1: Daily Team Monitor",
     "Page 2: Positional Breakdowns",
