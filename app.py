@@ -39,7 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# HIGH-SPEED PARSING ENGINE (CACHED STRINGS RECOVERY)
+# HIGH-SPEED MEMORY STREAM LOADING ENGINE
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_base_roster():
@@ -54,56 +54,72 @@ def load_base_roster():
     except:
         return None
 
-@st.cache_data(ttl=2)
-def load_central_sheet_tab(file_path, sheet_name, target_cols):
+# High-TTL cache prevents Streamlit from reopening Excel on page changes
+@st.cache_data(ttl=300)
+def load_entire_database_cache(file_path, gps_cols, force_cols, perch_cols, sprint_cols, nord_cols):
+    data_bundles = {
+        'df_gps': pd.DataFrame(), 'df_force': pd.DataFrame(), 'df_perch': pd.DataFrame(),
+        'df_sprint': pd.DataFrame(), 'df_nord': pd.DataFrame(), 'unique_dates': []
+    }
+    if not os.path.exists(file_path):
+        return data_bundles
+        
     try:
-        if not os.path.exists(file_path):
-            return pd.DataFrame()
-        
-        # Load workbook via low-overhead string passing
         xl_file = pd.ExcelFile(file_path)
-        if sheet_name not in xl_file.sheet_names:
-            return pd.DataFrame()
-            
-        df = pd.read_excel(xl_file, sheet_name=sheet_name)
-        df.columns = [str(c).strip() for c in df.columns]
+        sheet_configs = [
+            ('Catapult Data Dump', gps_cols, 'df_gps'),
+            ('Hawkins Data Dump', force_cols, 'df_force'),
+            ('Perch Data Dump', perch_cols, 'df_perch'),
+            ('Sprint 1080 Data Dump', sprint_cols, 'df_sprint'),
+            ('NordBord Data Dump', nord_cols, 'df_nord')
+        ]
         
-        rename_map = {}
-        for col in df.columns:
-            c_low = col.lower().strip()
-            if c_low in ['name', 'player', 'athlete', 'player name']: rename_map[col] = 'Player'
-            elif c_low == 'date': rename_map[col] = 'Date'
-            else:
-                for tc in target_cols:
-                    if c_low == tc.lower().strip():
-                        rename_map[col] = tc
-                        
-        df = df.rename(columns=rename_map)
-        if 'Player' not in df.columns:
-            return pd.DataFrame()
-            
-        df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
-        df['Date'] = df['Date'].astype(str).str.strip() if 'Date' in df.columns else "Manual Entry"
-        
-        for tc in target_cols:
-            if tc in df.columns:
-                df[tc] = pd.to_numeric(df[tc], errors='coerce').fillna(0.0)
-            else:
-                df[tc] = 0.0
+        all_dates = []
+        for sheet_name, target_cols, dict_key in sheet_configs:
+            if sheet_name in xl_file.sheet_names:
+                df = pd.read_excel(xl_file, sheet_name=sheet_name)
+                df.columns = [str(c).strip() for c in df.columns]
                 
-        pull_cols = ['Match_Key', 'Date'] + [tc for tc in target_cols if tc in df.columns]
-        return df[pull_cols]
+                rename_map = {}
+                for col in df.columns:
+                    c_low = col.lower().strip()
+                    if c_low in ['name', 'player', 'athlete', 'player name']: rename_map[col] = 'Player'
+                    elif c_low == 'date': rename_map[col] = 'Date'
+                    else:
+                        for tc in target_cols:
+                            if c_low == tc.lower().strip():
+                                rename_map[col] = tc
+                                
+                df = df.rename(columns=rename_map)
+                if 'Player' in df.columns:
+                    df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
+                    df['Date'] = df['Date'].astype(str).str.strip() if 'Date' in df.columns else "Manual Entry"
+                    
+                    for tc in target_cols:
+                        if tc in df.columns:
+                            df[tc] = pd.to_numeric(df[tc], errors='coerce').fillna(0.0)
+                        else:
+                            df[tc] = 0.0
+                            
+                    pull_cols = ['Match_Key', 'Date'] + [tc for tc in target_cols if tc in df.columns]
+                    data_bundles[dict_key] = df[pull_cols]
+                    if 'Date' in df.columns:
+                        all_dates.extend(df['Date'].dropna().unique().tolist())
+                        
+        unique_dates = list(set([str(d).strip() for d in all_dates if str(d).strip() != "Manual Entry"]))
+        data_bundles['unique_dates'] = sorted(unique_dates, reverse=True)
+        return data_bundles
     except:
-        return pd.DataFrame()
+        return data_bundles
 
 # -----------------------------------------------------------------------------
-# COORDINATE MAIN ROUTINES PIPELINE
+# COORDINATE PROGRAM PIPELINE
 # -----------------------------------------------------------------------------
 st.sidebar.title("Aggie Portal Control")
 
 master_roster = load_base_roster()
 if master_roster is None:
-    st.sidebar.error(f"⚠️ Roster base mapping '{ROSTER_FILE}' not found.")
+    st.sidebar.error(f"⚠️ Base file '{ROSTER_FILE}' missing.")
     st.stop()
 
 gps_cols = ['Total Distance (y)', 'Total Player Load', 'Player Load Per Minute', 'IMA Total', 'Explosive Yardage', 'Max Speed (mph)', 'Max Vel (% Max)']
@@ -112,55 +128,36 @@ nord_cols = ['Max Left Force (N)', 'Max Right Force (N)', 'Total Force (N)', 'Im
 sprint_cols = ['Distance (m)', 'Peak Speed (mph)', 'Peak Power (W)', 'Avg Force (N)']
 force_cols = ['Jump Height', 'mRSI']
 
-unique_dates = []
+# Load the single-scan memory layout object
+cache_bundle = load_entire_database_cache(DATABASE_FILE, gps_cols, force_cols, perch_cols, sprint_cols, nord_cols)
+
+df_gps = cache_bundle['df_gps']
+df_force = cache_bundle['df_force']
+df_perch = cache_bundle['df_perch']
+df_sprint = cache_bundle['df_sprint']
+df_nord = cache_bundle['df_nord']
+unique_dates = cache_bundle['unique_dates']
+
 selected_date = "Manual Entry"
-
-df_gps = load_central_sheet_tab(DATABASE_FILE, 'Catapult Data Dump', gps_cols)
-df_force = load_central_sheet_tab(DATABASE_FILE, 'Hawkins Data Dump', force_cols)
-df_perch = load_central_sheet_tab(DATABASE_FILE, 'Perch Data Dump', perch_cols)
-df_sprint = load_central_sheet_tab(DATABASE_FILE, 'Sprint 1080 Data Dump', sprint_cols)
-df_nord = load_central_sheet_tab(DATABASE_FILE, 'NordBord Data Dump', nord_cols)
-
-for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
-    if not current_df.empty and 'Date' in current_df.columns:
-        unique_dates.extend(current_df['Date'].dropna().unique().tolist())
-        
-unique_dates = list(set([str(d).strip() for d in unique_dates if str(d).strip() != "Manual Entry"]))
-unique_dates = sorted(unique_dates, reverse=True)
-
 if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Practice Date:", unique_dates)
-    st.sidebar.success("📊 Connected Live")
+    st.sidebar.success("📊 High-Speed Optimization Active")
 else:
-    st.sidebar.warning("⚠️ Syncing files... Initializing database view panels.")
-    # Fallback to direct raw files if master index sheet is still caching on server
-    if os.path.exists('Blake Daily GPS.csv'):
-        df_gps = pd.read_csv('Blake Daily GPS.csv')
-        df_gps.columns = [str(c).strip() for c in df_gps.columns]
-        df_gps = df_gps.rename(columns={'Name': 'Player'})
-        df_gps['Match_Key'] = df_gps['Player'].astype(str).str.strip().str.upper()
-        df_gps['Date'] = df_gps['Date'].astype(str).str.strip()
-        unique_dates = sorted(list(df_gps['Date'].dropna().unique()), reverse=True)
-        if unique_dates:
-            selected_date = st.sidebar.selectbox("🎯 Select Practice Date:", unique_dates)
+    st.sidebar.warning("⚠️ Reading master sheets...")
 
-# Build unified roster matrix sheet
+# High-speed data slice mapping
 working_df = master_roster.copy()
 
 def slice_and_merge(base_df, source_df, cols, date_val):
     if source_df.empty:
         for c in cols: base_df[c] = 0.0
         return base_df
-    # Match on standardized date format logic strings
     filtered = source_df[source_df['Date'] == date_val]
     if filtered.empty:
         for c in cols: base_df[c] = 0.0
         return base_df
-    
-    # Strip duplicate values to avoid row multiplication
     sub_df = filtered[['Match_Key'] + [c for c in cols if c in filtered.columns]].drop_duplicates(subset=['Match_Key'])
-    res = base_df.merge(sub_df, on='Match_Key', how='left')
-    return res
+    return base_df.merge(sub_df, on='Match_Key', how='left')
 
 working_df = slice_and_merge(working_df, df_gps, gps_cols, selected_date)
 working_df = slice_and_merge(working_df, df_perch, perch_cols, selected_date)
@@ -175,7 +172,7 @@ for metric in all_metrics:
     else:
         working_df[metric] = 0.0
 
-# 5-Page Navigation Hub
+# Navigation Switch Hub
 page = st.sidebar.radio("Select Portal Dashboard Module View:", [
     "Page 1: Daily Team Monitor",
     "Page 2: Positional Breakdowns",
@@ -187,7 +184,7 @@ page = st.sidebar.radio("Select Portal Dashboard Module View:", [
 # --- PAGE 1: DAILY TEAM MONITOR ---
 if page == "Page 1: Daily Team Monitor":
     st.title("👍 Texas A&M Football Performance Hub")
-    st.markdown(f"### Master Technology Matrix | Selected Practice Date: **{selected_date}**")
+    st.markdown(f"### Master Technology Matrix | Date: **{selected_date}**")
     st.divider()
     
     tech_tab = st.radio("Toggle Applied Performance Technology View:", ["Catapult GPS Overview", "VBT Room (Perch)", "Hamstring Strength (NordBord)", "Speed Profiling (1080 Sprint)", "Neuromuscular (Force Plates)"], horizontal=True)
@@ -197,26 +194,25 @@ if page == "Page 1: Daily Team Monitor":
     display_df = working_df[working_df['Position Group'].isin(selected_groups)]
     
     if tech_tab == "Catapult GPS Overview":
-        st.dataframe(display_df[['Player', 'Position', 'Position Group', 'Total Distance (y)', 'Explosive Yardage', 'Total Player Load', 'Max Speed (mph)', 'Max Vel (% Max)']].sort_values(by='Total Distance (y)', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(display_df[['Player', 'Position', 'Position Group', 'Total Distance (y)', 'Explosive Yardage', 'Total Player Load', 'Max Speed (mph)', 'Max Vel (% Max)']].sort_values(by='Total Distance (y)', ascending=False), width='stretch', hide_index=True)
     elif tech_tab == "VBT Room (Perch)":
-        st.dataframe(display_df[['Player', 'Position', 'Mean Velocity (m/s)', 'Peak Velocity (m/s)', 'Peak Power (W)']].sort_values(by='Peak Power (W)', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(display_df[['Player', 'Position', 'Mean Velocity (m/s)', 'Peak Velocity (m/s)', 'Peak Power (W)']].sort_values(by='Peak Power (W)', ascending=False), width='stretch', hide_index=True)
     elif tech_tab == "Hamstring Strength (NordBord)":
-        st.dataframe(display_df[['Player', 'Position', 'Max Left Force (N)', 'Max Right Force (N)', 'Total Force (N)', 'Imbalance (%)']].sort_values(by='Total Force (N)', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(display_df[['Player', 'Position', 'Max Left Force (N)', 'Max Right Force (N)', 'Total Force (N)', 'Imbalance (%)']].sort_values(by='Total Force (N)', ascending=False), width='stretch', hide_index=True)
     elif tech_tab == "Speed Profiling (1080 Sprint)":
-        st.dataframe(display_df[['Player', 'Position', 'Distance (m)', 'Peak Speed (mph)', 'Peak Power (W)', 'Avg Force (N)']].sort_values(by='Peak Speed (mph)', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(display_df[['Player', 'Position', 'Distance (m)', 'Peak Speed (mph)']].sort_values(by='Peak Speed (mph)', ascending=False), width='stretch', hide_index=True)
     elif tech_tab == "Neuromuscular (Force Plates)":
-        st.dataframe(display_df[['Player', 'Position', 'Jump Height', 'mRSI']].sort_values(by='mRSI', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(display_df[['Player', 'Position', 'Jump Height', 'mRSI']].sort_values(by='mRSI', ascending=False), width='stretch', hide_index=True)
 
 # --- PAGE 2: POSITIONAL BREAKDOWNS ---
 elif page == "Page 2: Positional Breakdowns":
     st.title("🎯 Positional Architecture Performance Tiers")
-    st.markdown(f"### Positional Group Leaderboards for **{selected_date}**")
     st.divider()
     
     for group in ['Skill', 'Mid', 'Big']:
         st.markdown(f"## **{group.upper()} UNIT LEADERBOARD**")
         g_df = working_df[working_df['Position Group'] == group]
-        st.dataframe(g_df[['Player', 'Position', 'Total Distance (y)', 'Explosive Yardage', 'Max Speed (mph)', 'Peak Power (W)', 'mRSI']].sort_values(by='Explosive Yardage', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(g_df[['Player', 'Position', 'Total Distance (y)', 'Explosive Yardage', 'Max Speed (mph)', 'mRSI']].sort_values(by='Explosive Yardage', ascending=False), width='stretch', hide_index=True)
 
 # --- PAGE 3: INDIVIDUAL ATHLETE DIAGNOSTIC ---
 elif page == "Page 3: Individual Athlete Diagnostic":
@@ -231,9 +227,8 @@ elif page == "Page 3: Individual Athlete Diagnostic":
         st.subheader("🕸️ Performance Capacity Spider Chart")
         categories = ['Velocity (Max Speed)', 'Power (Explosive Yds)', 'Force (mRSI)', 'Capacity (Player Load)', 'Vertical (Jump Height)']
         
-        # Guard math logic from collapsing into empty references
         s_vel = min(100, int((float(p_row['Max Speed (mph)']) / 23.0) * 100)) if float(p_row['Max Speed (mph)']) > 0 else 45
-        s_pow = min(100, int((float(p_row['Explosive Yardage']) / 800.0) * 100)) if float(p_row['Explosive Yardage'] ) > 0 else 45
+        s_pow = min(100, int((float(p_row['Explosive Yardage']) / 800.0) * 100)) if float(p_row['Explosive Yardage']) > 0 else 45
         s_for = min(100, int((float(p_row['mRSI']) / 0.80) * 100)) if float(p_row['mRSI']) > 0 else 45
         s_cap = min(100, int((float(p_row['Total Player Load']) / 650.0) * 100)) if float(p_row['Total Player Load']) > 0 else 45
         s_vrt = min(100, int((float(p_row['Jump Height']) / 20.0) * 100)) if float(p_row['Jump Height']) > 0 else 45
@@ -258,7 +253,7 @@ elif page == "Page 3: Individual Athlete Diagnostic":
         cx2.metric("NordBord Imbalance", f"{p_row['Imbalance (%)']}%")
         st.divider()
         cx3, cx4 = st.columns(2)
-        cx3.metric("1080 Peak Speed", f"{p_row['Peak Speed (mph)']} mph")
+        cx3.metric("GPS Max Speed", f"{p_row['Max Speed (mph)']} mph")
         cx4.metric("Hawkins mRSI", f"{p_row['mRSI']}")
 
 # --- PAGE 4: SUMMER 2026 TARGET TRACKING ---
@@ -266,7 +261,6 @@ elif page == "Page 4: Summer 2026 Target Tracking":
     st.title("☀️ Summer 2026 Macrocycle Target Board")
     st.divider()
     
-    # Secure positional baseline means safely
     s_group = working_df[working_df['Position Group']=='Skill']
     m_group = working_df[working_df['Position Group']=='Mid']
     b_group = working_df[working_df['Position Group']=='Big']
@@ -312,5 +306,4 @@ elif page == "Page 5: Tactical Practice Planner":
             cx1.metric("Calculated Duration", f"{plan_df['Duration'].sum()} Mins")
             cx2.metric("Estimated Player Load", int(plan_df['Total Load Calc'].sum()))
             cx3.metric("Estimated Distance", f"{int(plan_df['Total Dist Calc'].sum())} yds")
-            st.dataframe(plan_df, use_container_width=True, hide_index=True)
-            
+            st.dataframe(plan_df, width='stretch', hide_index=True)
