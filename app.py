@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 # CORE CONFIGURATION FILE TARGETS
 # -----------------------------------------------------------------------------
 ROSTER_FILE = "Name KEy Football APP.csv"
-DATABASE_FILE = "Aggie_Master_Database.xlsx"
+DATABASE_FILE = "Aggie Database.xlsx"
 
 # -----------------------------------------------------------------------------
 # EXECUTIVE AGGIE ONYX STYLE DIRECTIVES
@@ -39,57 +39,55 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# MASTER DATA PARSING LOADER
+# MASTER DATA PARSING LOADER (ERRORS EXPOSED)
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_base_roster():
     if not os.path.exists(ROSTER_FILE):
+        st.error(f"❌ Roster file missing from directory: Looking for '{ROSTER_FILE}'")
         return None
-    try:
-        df = pd.read_csv(ROSTER_FILE)
-        df.columns = [str(c).strip() for c in df.columns]
-        df = df.rename(columns={'Name': 'Player', 'POS': 'Position', 'Skill': 'Position Group'})
-        df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
-        return df[['Player', 'Position', 'Position Group', 'Match_Key']]
-    except:
-        return None
+    df = pd.read_csv(ROSTER_FILE)
+    df.columns = [str(c).strip() for c in df.columns]
+    df = df.rename(columns={'Name': 'Player', 'POS': 'Position', 'Skill': 'Position Group'})
+    df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
+    return df[['Player', 'Position', 'Position Group', 'Match_Key']]
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=5)
 def load_central_sheet_tab(xl_file, sheet_name, target_cols):
-    try:
-        if sheet_name not in xl_file.sheet_names:
-            return pd.DataFrame()
-            
-        df = pd.read_excel(xl_file, sheet_name=sheet_name)
-        df.columns = [str(c).strip() for c in df.columns]
-        
-        rename_map = {}
-        for col in df.columns:
-            c_low = col.lower().strip()
-            if c_low in ['name', 'player', 'athlete', 'player name']: rename_map[col] = 'Player'
-            elif c_low == 'date': rename_map[col] = 'Date'
-            else:
-                for tc in target_cols:
-                    if c_low == tc.lower().strip():
-                        rename_map[col] = tc
-                        
-        df = df.rename(columns=rename_map)
-        if 'Player' not in df.columns:
-            return pd.DataFrame()
-            
-        df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
-        df['Date'] = df['Date'].astype(str).str.strip() if 'Date' in df.columns else "Manual Entry"
-        
-        for tc in target_cols:
-            if tc in df.columns:
-                df[tc] = pd.to_numeric(df[tc], errors='coerce').fillna(0.0)
-            else:
-                df[tc] = 0.0
-                
-        pull_cols = ['Match_Key', 'Date'] + [tc for tc in target_cols if tc in df.columns]
-        return df[pull_cols]
-    except:
+    if sheet_name not in xl_file.sheet_names:
+        st.error(f"❌ Tab Missing: Could not find a sheet named '{sheet_name}' inside your Excel file.")
+        st.info(f"Available tabs found in your file are: {xl_file.sheet_names}")
         return pd.DataFrame()
+        
+    df = pd.read_excel(xl_file, sheet_name=sheet_name)
+    df.columns = [str(c).strip() for c in df.columns]
+    
+    rename_map = {}
+    for col in df.columns:
+        c_low = col.lower().strip()
+        if c_low in ['name', 'player', 'athlete', 'player name']: rename_map[col] = 'Player'
+        elif c_low == 'date': rename_map[col] = 'Date'
+        else:
+            for tc in target_cols:
+                if c_low == tc.lower().strip():
+                    rename_map[col] = tc
+                    
+    df = df.rename(columns=rename_map)
+    if 'Player' not in df.columns:
+        st.error(f"❌ Column Mapping Error: Tab '{sheet_name}' has no column named 'Name' or 'Player'.")
+        return pd.DataFrame()
+        
+    df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
+    df['Date'] = df['Date'].astype(str).str.strip() if 'Date' in df.columns else "Manual Entry"
+    
+    for tc in target_cols:
+        if tc in df.columns:
+            df[tc] = pd.to_numeric(df[tc], errors='coerce').fillna(0.0)
+        else:
+            df[tc] = 0.0
+            
+    pull_cols = ['Match_Key', 'Date'] + [tc for tc in target_cols if tc in df.columns]
+    return df[pull_cols]
 
 # -----------------------------------------------------------------------------
 # COORDINATE MAIN ROUTINES PIPELINE
@@ -98,7 +96,6 @@ st.sidebar.title("Aggie Portal Control")
 
 master_roster = load_base_roster()
 if master_roster is None:
-    st.sidebar.error(f"⚠️ Roster base mapping '{ROSTER_FILE}' not found.")
     st.stop()
 
 gps_cols = ['Total Distance (y)', 'Total Player Load', 'Player Load Per Minute', 'IMA Total', 'Explosive Yardage', 'Max Speed (mph)', 'Max Vel (% Max)']
@@ -110,34 +107,36 @@ force_cols = ['Jump Height', 'mRSI']
 unique_dates = []
 selected_date = "Manual Entry"
 
-if os.path.exists(DATABASE_FILE):
-    try:
-        xl = pd.ExcelFile(DATABASE_FILE)
+# Verify Excel path directly
+if not os.path.exists(DATABASE_FILE):
+    st.error(f"❌ Excel File Not Found: Looking for a file named exactly '{DATABASE_FILE}' in your repository.")
+    st.info(f"Files currently inside your repository are: {os.listdir('.')}")
+    st.stop()
+
+# Force standard execution with explicit error output
+xl = pd.ExcelFile(DATABASE_FILE)
+
+df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
+df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
+df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
+df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
+df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
+
+for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
+    if not current_df.empty and 'Date' in current_df.columns:
+        unique_dates.extend(current_df['Date'].dropna().unique().tolist())
         
-        df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
-        df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
-        df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
-        df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
-        df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
-        
-        # Simple, non-breaking check for any dates in the file
-        for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
-            if not current_df.empty and 'Date' in current_df.columns:
-                unique_dates.extend(current_df['Date'].dropna().unique().tolist())
-                
-        unique_dates = list(set([str(d).strip() for d in unique_dates if str(d).strip() != "Manual Entry"]))
-        unique_dates = sorted(unique_dates, reverse=True)
-    except:
-        pass
+unique_dates = list(set([str(d).strip() for d in unique_dates if str(d).strip() != "Manual Entry"]))
+unique_dates = sorted(unique_dates, reverse=True)
 
 if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Practice Date:", unique_dates)
     st.sidebar.success("📊 Database Centralized File: Connected & Live")
 else:
-    st.sidebar.warning("⚠️ Syncing data elements... Dashboard will populate shortly.")
-    df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    st.error("❌ Date Selection Error: The app loaded the file but found zero valid entries in the 'Date' columns across your tabs.")
+    st.stop()
 
-# Clean merge step matching original behavior
+# Combine separate technology sheets onto your master roster canvas map
 working_df = master_roster.copy()
 
 def slice_and_merge(base_df, source_df, cols, date_val):
@@ -163,7 +162,7 @@ for metric in all_metrics:
     else:
         working_df[metric] = 0.0
 
-# Navigation Panel Options
+# 5-Page Dashboard Navigation Selector
 page = st.sidebar.radio("Select Portal Dashboard Module View:", [
     "Page 1: Daily Team Monitor",
     "Page 2: Positional Breakdowns",
