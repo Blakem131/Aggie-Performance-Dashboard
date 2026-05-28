@@ -79,10 +79,15 @@ def load_central_sheet_tab(xl_file, sheet_name, target_cols):
         if 'Player' not in df.columns:
             return pd.DataFrame()
             
+        # Clean out any metadata export header lines that aren't actual athlete names
+        df = df[df['Player'].astype(str).str.lower().str.strip().all(lambda x: 'time' not in x and 'unix' not in x)]
+        
         df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
         
         if 'Date' in df.columns:
             df['Date'] = df['Date'].astype(str).str.split().str[0].str.strip()
+            # Drop rows where the date field accidentally caught metadata tags
+            df = df[df['Date'].str.contains('/', na=False) | df['Date'].str.contains('-', na=False)]
         else:
             df['Date'] = "Manual Entry"
         
@@ -128,23 +133,21 @@ if os.path.exists(DATABASE_FILE):
         df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
         df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
         
-        # Drive the Master Calendar Selector primarily off field practice dates (GPS)
-        if not df_gps.empty and 'Date' in df_gps.columns:
-            unique_dates = sorted(list(df_gps['Date'].dropna().unique()), reverse=True)
-        else:
-            all_logged_dates = []
-            for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
-                if not current_df.empty and 'Date' in current_df.columns:
-                    all_logged_dates.extend(current_df['Date'].unique().tolist())
-            unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
-            
-        if "Manual Entry" in unique_dates: unique_dates.remove("Manual Entry")
+        # Pull logged dates across sheets cleanly
+        all_logged_dates = []
+        for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
+            if not current_df.empty and 'Date' in current_df.columns:
+                all_logged_dates.extend(current_df['Date'].unique().tolist())
+                
+        # Filter out elements that are completely empty or text placeholders
+        all_logged_dates = [d for d in all_logged_dates if d and d != "Manual Entry" and ('/' in d or '-' in d)]
+        unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
     except:
         pass
 
 if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Training/Practice Date:", unique_dates)
-    st.sidebar.success("📊 Central Workbook: Connected & Live")
+    st.sidebar.success(" 📊 Central Workbook: Connected & Live")
 else:
     st.sidebar.warning("⚠️ Syncing data elements... App initializing.")
     df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
