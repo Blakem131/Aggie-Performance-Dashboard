@@ -1,21 +1,18 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
 import os
 import plotly.express as px
 import plotly.graph_objects as go
 
 # -----------------------------------------------------------------------------
-# CORE CONFIGURATION LINKS & API PARAMETERS
+# CORE CONFIGURATION FILE TARGETS
 # -----------------------------------------------------------------------------
 ROSTER_FILE = "Name KEy Football APP.csv"
-HAWKINS_TOKEN_URL = "https://cloud.hawkindynamics.com/api/token"
-HAWKINS_API_URL = "https://cloud.hawkindynamics.com/api/v1"
-HAWKINS_KEY = "C4Bb7P.CQVnIrrXMjKwB4dTS5LZEUDtUPuDw"
+DATABASE_FILE = "Aggie_Master_Database.xlsx"
 
 # -----------------------------------------------------------------------------
-# LIGHTWEIGHT AGGIE ONYX STYLE ARCHITECTURE
+# EXECUTIVE AGGIE ONYX STYLE DIRECTIVES
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Texas A&M Football Performance Portal", layout="wide")
 
@@ -42,67 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# LIVE HAWKINS DYNAMICS API NETWORK DATA CONNECTOR
-# -----------------------------------------------------------------------------
-@st.cache_data(ttl=900)  # Caches force plate pull data for 15 minutes to save bandwidth
-def fetch_hawkins_force_data():
-    try:
-        api_key_string = HAWKINS_KEY
-        if "." not in api_key_string:
-            return None
-            
-        client_id, client_secret = api_key_string.split(".", 1)
-        
-        token_payload = {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "grant_type": "client_credentials"
-        }
-        
-        token_response = requests.post(
-            HAWKINS_TOKEN_URL, 
-            json=token_payload, 
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        if token_response.status_code != 200:
-            return None
-            
-        access_token = token_response.json().get("access_token", token_response.json().get("token"))
-        if not access_token:
-            return None
-            
-        headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
-        
-        test_response = requests.get(f"{HAWKINS_API_URL}/tests", headers=headers, timeout=10)
-        if test_response.status_code != 200:
-            return None
-            
-        raw_tests = test_response.json().get("data", [])
-        
-        parsed_records = []
-        for test in raw_tests:
-            athlete_name = test.get("athlete", {}).get("name", "")
-            metrics = test.get("metrics", {})
-            
-            parsed_records.append({
-                'Match_Key': str(athlete_name).strip().upper(),
-                'Jump Height': float(metrics.get("jump_height", metrics.get("vertical_jump_in", 0.0))),
-                'mRSI': float(metrics.get("mrsi", metrics.get("rsi_modified", 0.0)))
-            })
-            
-        if len(parsed_records) == 0:
-            return None
-            
-        df_hawk = pd.DataFrame(parsed_records)
-        df_hawk = df_hawk.groupby('Match_Key').agg({'Jump Height': 'max', 'mRSI': 'max'}).reset_index()
-        return df_hawk
-    except:
-        return None
-
-# -----------------------------------------------------------------------------
-# MASTER DATA FRAME REPOSITORY CLEANERS
+# MASTER SAFE DATA PARSING LOADER
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_base_roster():
@@ -117,148 +54,108 @@ def load_base_roster():
     except:
         return None
 
-def process_master_database(file_source):
+@st.cache_data(ttl=60)  # Checks for your fresh desktop uploads every single minute
+def load_central_sheet_tab(sheet_name, target_cols):
+    if not os.path.exists(DATABASE_FILE):
+        return pd.DataFrame()
     try:
-        if file_source.name.endswith('.csv'):
-            df = pd.read_csv(file_source)
-        else:
-            df = pd.read_excel(file_source)
-            
+        df = pd.read_excel(DATABASE_FILE, sheet_name=sheet_name)
         df.columns = [str(c).strip() for c in df.columns]
         
-        if 'Period Name' in df.columns:
-            df = df[df['Period Name'].str.lower().str.strip() == 'session']
-            
-        # STRICT TARGET MAPPING ENGINE: Locks strictly onto your exact column headers
-        target_columns = [
-            'Total Player Load', 'Explosive Yardage', 'Player Load Per Minute', 'IMA Total', 
-            'Total Distance (y)', 'Max Speed (mph)', 'Max Vel (% Max)', 'Acceleration B1-3 Total Efforts (Gen 2)', 
-            'Deceleration B1-3 Total Efforts (Gen 2)', 'Max Acceleration', 'Max Deceleration', 
-            'Maximum Heart Rate', 'Avg Heart Rate', 'Heart Rate Band 1 Total Duration', 
-            'Heart Rate Band 2 Total Duration', 'Heart Rate Band 3 Total Duration', 
-            'Heart Rate Band 4 Total Duration', 'Heart Rate Band 5 Total Duration', 
-            'Heart Rate Band 6 Total Duration', 'Heart Rate Band 7 Total Duration', 
-            'Heart Rate Band 8 Total Duration', 'Velo (85-100%) Total Effort Count', 
-            'Velo (85-100%) Total Dist', 'Player Load (2D)', 'Player Load (1D Fwd)', 
-            'Player Load (1D Side)', 'Player Load (1D Up)', 'IMA Impacts Band 1 Count', 
-            'IMA Impacts Band 2 Count', 'IMA Impacts Band 3 Count', 'High Metabolic Load Distance (y)'
-        ]
-        
+        # Standardize anchor name tracking systems
         rename_map = {}
         for col in df.columns:
             c_low = col.lower().strip()
-            if c_low in ['name', 'player', 'athlete', 'player name']:
-                rename_map[col] = 'Player'
-            elif c_low == 'date':
-                rename_map[col] = 'Date'
+            if c_low in ['name', 'player', 'athlete']: rename_map[col] = 'Player'
+            elif c_low == 'date': rename_map[col] = 'Date'
             else:
-                for tc in target_columns:
+                for tc in target_cols:
                     if c_low == tc.lower().strip():
                         rename_map[col] = tc
                         
         df = df.rename(columns=rename_map)
-        
-        if 'Date' not in df.columns:
-            df['Date'] = "Manual Entry"
+        if 'Player' not in df.columns:
+            return pd.DataFrame()
             
-        df['Date'] = df['Date'].astype(str).str.strip()
         df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
+        df['Date'] = df['Date'].astype(str).str.strip() if 'Date' in df.columns else "Manual Entry"
         
-        final_pull_cols = ['Match_Key', 'Date'] + [tc for tc in target_columns if tc in df.columns]
-        
-        for tc in target_columns:
+        # Enforce numeric arrays securely
+        for tc in target_cols:
             if tc in df.columns:
                 df[tc] = pd.to_numeric(df[tc], errors='coerce').fillna(0.0)
+            else:
+                df[tc] = 0.0
                 
-        return df[final_pull_cols]
-    except Exception as e:
-        st.sidebar.error(f"Error parsing database format: {str(e)}")
-        return None
+        pull_cols = ['Match_Key', 'Date'] + [tc for tc in target_cols if tc in df.columns]
+        return df[pull_cols]
+    except:
+        return pd.DataFrame()
 
 # -----------------------------------------------------------------------------
-# RUN ROUTINES PIPELINE EXECUTION
+# COORDINATE MASTER ROUTINES PIPELINE
 # -----------------------------------------------------------------------------
-st.sidebar.title("Aggie System Control")
+st.sidebar.title("Aggie Portal Control")
 
 master_roster = load_base_roster()
 if master_roster is None:
-    st.sidebar.error(f"⚠️ Master roster file '{ROSTER_FILE}' not found.")
+    st.sidebar.error(f"⚠️ Roster base mapping '{ROSTER_FILE}' not found.")
     st.stop()
 
-# Live Core Force Plate Data Integration Connection Trigger
-hawkins_data = fetch_hawkins_force_data()
-if hawkins_data is not None:
-    st.sidebar.success(f"🔋 Hawkins Dynamics API Live Connected")
-else:
-    st.sidebar.warning("🔌 Hawkins API Offline: Using System Safe-Fallbacks")
+# Core Data Vault Column Definitions
+gps_cols = ['Total Distance (y)', 'Total Player Load', 'Player Load Per Minute', 'IMA Total', 'Explosive Yardage', 'Max Speed (mph)', 'Max Vel (% Max)']
+perch_cols = ['Mean Velocity (m/s)', 'Peak Velocity (m/s)', 'Peak Power (W)']
+nord_cols = ['Max Left Force (N)', 'Max Right Force (N)', 'Total Force (N)', 'Imbalance (%)']
+sprint_cols = ['Distance (m)', 'Peak Speed (mph)', 'Peak Power (W)', 'Avg Force (N)']
+force_cols = ['Jump Height', 'mRSI']
 
-# Dropdown Database Setup Panel
-uploaded_db = st.sidebar.file_uploader("Upload Master Performance Database File:", type=["csv", "xlsx"])
+# Background Extraction Pipeline Execution
+df_gps = load_central_sheet_tab('GPS_Data', gps_cols)
+df_perch = load_central_sheet_tab('VBT_Perch', perch_cols)
+df_nord = load_central_sheet_tab('NordBord', nord_cols)
+df_sprint = load_central_sheet_tab('Sprint_1080', sprint_cols)
+df_force = load_central_sheet_tab('Force_Plates', force_cols)
 
-if uploaded_db is not None:
-    historical_logs = process_master_database(uploaded_db)
-    if historical_logs is not None and len(historical_logs) > 0:
-        unique_dates = sorted(list(historical_logs['Date'].unique()), reverse=True)
-        selected_date = st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", unique_dates)
+# Collect comprehensive session calendar dates directly out of your data logs
+all_logged_dates = []
+for current_df in [df_gps, df_perch, df_nord, df_sprint, df_force]:
+    if not current_df.empty and 'Date' in current_df.columns:
+        all_logged_dates.extend(current_df['Date'].unique().tolist())
         
-        day_filtered = historical_logs[historical_logs['Date'] == selected_date]
-        gps_df = master_roster.merge(day_filtered, on='Match_Key', how='left')
-        st.sidebar.success(f"⚡ Connected: {len(unique_dates)} Practice Sessions Live")
+unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
+
+if len(unique_dates) > 0 and unique_dates != ["Manual Entry"]:
+    selected_date = st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", unique_dates)
+    st.sidebar.success("📊 Database Centralized File: Connected & Live")
+else:
+    selected_date = "System Simulation Mode"
+    st.sidebar.warning("⚠️ Syncing Base File... Check back in 30 seconds.")
+
+# Combine separate technology sheets onto your master 106-athlete canvas map
+working_df = master_roster.copy()
+
+def slice_and_merge(base_df, source_df, cols, date_val):
+    if source_df.empty:
+        for c in cols: base_df[c] = 0.0
+        return base_df
+    filtered = source_df[source_df['Date'] == date_val]
+    return base_df.merge(filtered[['Match_Key'] + cols], on='Match_Key', how='left')
+
+working_df = slice_and_merge(working_df, df_gps, gps_cols, selected_date)
+working_df = slice_and_merge(working_df, df_perch, perch_cols, selected_date)
+working_df = slice_and_merge(working_df, df_nord, nord_cols, selected_date)
+working_df = slice_and_merge(working_df, df_sprint, sprint_cols, selected_date)
+working_df = slice_and_merge(working_df, df_force, force_cols, selected_date)
+
+# Fast loop verification layout sweep to wipe out null cell errors
+all_metrics = gps_cols + perch_cols + nord_cols + sprint_cols + force_cols
+for metric in all_metrics:
+    if metric in working_df.columns:
+        working_df[metric] = working_df[metric].fillna(0.0).round(1)
     else:
-        gps_df = master_roster.copy()
-        selected_date = "Template Framework Mode"
-else:
-    st.sidebar.info("📥 Drag and drop your main database file to activate historical timelines.")
-    st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", ["No Database Active"])
-    gps_df = master_roster.copy()
-    selected_date = "Roster Active Mode"
+        working_df[metric] = 0.0
 
-# Loop definitions to secure clean data values across all variables
-target_columns = [
-    'Total Player Load', 'Explosive Yardage', 'Player Load Per Minute', 'IMA Total', 
-    'Total Distance (y)', 'Max Speed (mph)', 'Max Vel (% Max)', 'Acceleration B1-3 Total Efforts (Gen 2)', 
-    'Deceleration B1-3 Total Efforts (Gen 2)', 'Max Acceleration', 'Max Deceleration', 
-    'Maximum Heart Rate', 'Avg Heart Rate', 'Heart Rate Band 1 Total Duration', 
-    'Heart Rate Band 2 Total Duration', 'Heart Rate Band 3 Total Duration', 
-    'Heart Rate Band 4 Total Duration', 'Heart Rate Band 5 Total Duration', 
-    'Heart Rate Band 6 Total Duration', 'Heart Rate Band 7 Total Duration', 
-    'Heart Rate Band 8 Total Duration', 'Velo (85-100%) Total Effort Count', 
-    'Velo (85-100%) Total Dist', 'Player Load (2D)', 'Player Load (1D Fwd)', 
-    'Player Load (1D Side)', 'Player Load (1D Up)', 'IMA Impacts Band 1 Count', 
-    'IMA Impacts Band 2 Count', 'IMA Impacts Band 3 Count', 'High Metabolic Load Distance (y)'
-]
-for tc in target_columns:
-    if tc not in gps_df.columns:
-        gps_df[tc] = 0.0
-    gps_df[tc] = gps_df[tc].fillna(0.0).round(1)
-
-# Map Live Hawkins Data into the core data table frame
-if hawkins_data is not None:
-    gps_df = gps_df.merge(hawkins_data, on='Match_Key', how='left')
-    gps_df['Jump Height'] = gps_df['Jump Height'].fillna(0.0).round(1)
-    gps_df['mRSI'] = gps_df['mRSI'].fillna(0.0).round(2)
-else:
-    np.random.seed(42)
-    gps_df['Jump Height'] = np.random.uniform(14.2, 19.8, len(gps_df)).round(1)
-    gps_df['mRSI'] = np.random.uniform(0.52, 0.79, len(gps_df)).round(2)
-
-gps_df['ACWR'] = np.random.uniform(0.85, 1.45, len(gps_df)).round(2)
-
-# Generate multi-week history records array layers for trend visuals
-dates_5w = ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5"]
-history_records = []
-for idx, row in gps_df.iterrows():
-    for w_idx, w_name in enumerate(dates_5w):
-        factor = 1.0 + (w_idx - 4) * 0.03 + np.random.uniform(-0.04, 0.04)
-        history_records.append({
-            'Player': row['Player'], 'Week': w_name,
-            'Jump Height History': round(row['Jump Height'] * factor, 1) if row['Jump Height'] > 0 else round(16.2 * factor, 1),
-            'Total Distance History': round(row['Total Distance (y)'] * factor, 1) if row['Total Distance (y)'] > 0 else round(3200.0 * factor, 1),
-            'mRSI History': round(row['mRSI'] * factor, 2) if row['mRSI'] > 0 else round(0.62 * factor, 2)
-        })
-compiled_history = pd.DataFrame(history_records)
-
-# 5-Page Dashboard Navigation Layout Module Selector
+# 5-Page Dashboard Navigation Selector
 page = st.sidebar.radio("Select Portal Dashboard Module View:", [
     "Page 1: Daily Team Monitor",
     "Page 2: Positional Breakdowns",
@@ -270,44 +167,54 @@ page = st.sidebar.radio("Select Portal Dashboard Module View:", [
 # --- PAGE 1: DAILY TEAM MONITOR ---
 if page == "Page 1: Daily Team Monitor":
     st.title("👍 Texas A&M Football Performance Hub")
-    st.markdown(f"### Master Volume Dashboard View | Current Practice Date: **{selected_date}**")
+    st.markdown(f"### Master Technology Matrix | Selected Practice Date: **{selected_date}**")
     st.divider()
     
-    pos_opts = list(gps_df['Position Group'].unique())
-    selected_groups = st.multiselect("Filter Roster Segmentations:", pos_opts, default=pos_opts)
-    display_df = gps_df[gps_df['Position Group'].isin(selected_groups)]
+    tech_tab = st.radio("Toggle Applied Performance Technology View:", ["Catapult GPS Overview", "VBT Room (Perch)", "Hamstring Strength (NordBord)", "Speed Profiling (1080 Sprint)", "Neuromuscular (Force Plates)"], horizontal=True)
     
-    st.dataframe(display_df[['Player', 'Position', 'Position Group', 'Total Distance (y)', 'Explosive Yardage', 'Total Player Load', 'Max Speed (mph)', 'Jump Height', 'mRSI', 'ACWR']].sort_values(by='Total Distance (y)', ascending=False), use_container_width=True, hide_index=True)
+    pos_opts = list(working_df['Position Group'].unique())
+    selected_groups = st.multiselect("Filter Roster Segmentations:", pos_opts, default=pos_opts)
+    display_df = working_df[working_df['Position Group'].isin(selected_groups)]
+    
+    if tech_tab == "Catapult GPS Overview":
+        st.dataframe(display_df[['Player', 'Position', 'Position Group', 'Total Distance (y)', 'Explosive Yardage', 'Total Player Load', 'Max Speed (mph)', 'Max Vel (% Max)']].sort_values(by='Total Distance (y)', ascending=False), use_container_width=True, hide_index=True)
+    elif tech_tab == "VBT Room (Perch)":
+        st.dataframe(display_df[['Player', 'Position', 'Mean Velocity (m/s)', 'Peak Velocity (m/s)', 'Peak Power (W)']].sort_values(by='Peak Power (W)', ascending=False), use_container_width=True, hide_index=True)
+    elif tech_tab == "Hamstring Strength (NordBord)":
+        st.dataframe(display_df[['Player', 'Position', 'Max Left Force (N)', 'Max Right Force (N)', 'Total Force (N)', 'Imbalance (%)']].sort_values(by='Total Force (N)', ascending=False), use_container_width=True, hide_index=True)
+    elif tech_tab == "Speed Profiling (1080 Sprint)":
+        st.dataframe(display_df[['Player', 'Position', 'Distance (m)', 'Peak Speed (mph)', 'Peak Power (W)', 'Avg Force (N)']].sort_values(by='Peak Speed (mph)', ascending=False), use_container_width=True, hide_index=True)
+    elif tech_tab == "Neuromuscular (Force Plates)":
+        st.dataframe(display_df[['Player', 'Position', 'Jump Height', 'mRSI']].sort_values(by='mRSI', ascending=False), use_container_width=True, hide_index=True)
 
 # --- PAGE 2: POSITIONAL BREAKDOWNS ---
 elif page == "Page 2: Positional Breakdowns":
     st.title("🎯 Positional Architecture Performance Tiers")
-    st.markdown(f"### Positional Group leaderboards for **{selected_date}**")
+    st.markdown(f"### Positional Group Leaderboards for **{selected_date}**")
     st.divider()
     
     for group in ['Skill', 'Mid', 'Big']:
         st.markdown(f"## **{group.upper()} UNIT LEADERBOARD**")
-        g_df = gps_df[gps_df['Position Group'] == group]
-        st.dataframe(g_df[['Player', 'Position', 'Total Distance (y)', 'Explosive Yardage', 'Max Speed (mph)', 'mRSI']].sort_values(by='Explosive Yardage', ascending=False), use_container_width=True, hide_index=True)
+        g_df = working_df[working_df['Position Group'] == group]
+        st.dataframe(g_df[['Player', 'Position', 'Total Distance (y)', 'Explosive Yardage', 'Max Speed (mph)', 'Peak Power (W)', 'mRSI']].sort_values(by='Explosive Yardage', ascending=False), use_container_width=True, hide_index=True)
 
 # --- PAGE 3: INDIVIDUAL ATHLETE DIAGNOSTIC ---
 elif page == "Page 3: Individual Athlete Diagnostic":
     st.title("👤 Individual Athlete Profile Diagnostics")
     st.divider()
     
-    selected_p = st.selectbox("Select Target Athlete Profile Panel:", gps_df['Player'].tolist())
-    p_row = gps_df[gps_df['Player'] == selected_p].iloc[0]
-    p_hist = compiled_history[compiled_history['Player'] == selected_p]
+    selected_p = st.selectbox("Select Target Athlete Profile Panel:", working_df['Player'].tolist())
+    p_row = working_df[working_df['Player'] == selected_p].iloc[0]
     
     col1, col2 = st.columns([1, 1])
     with col1:
         st.subheader("🕸️ Performance Capacity Spider Chart")
         categories = ['Velocity (Max Speed)', 'Power (Explosive Yds)', 'Force (mRSI)', 'Capacity (Player Load)', 'Vertical (Jump Height)']
-        s_vel = min(100, int((p_row['Max Speed (mph)'] / 23.0) * 100)) if p_row['Max Speed (mph)'] > 0 else 0
-        s_pow = min(100, int((p_row['Explosive Yardage'] / 800.0) * 100)) if p_row['Explosive Yardage'] > 0 else 0
-        s_for = min(100, int((p_row['mRSI'] / 0.80) * 100)) if p_row['mRSI'] > 0 else 0
-        s_cap = min(100, int((p_row['Total Player Load'] / 650.0) * 100)) if p_row['Total Player Load'] > 0 else 0
-        s_vrt = min(100, int((p_row['Jump Height'] / 20.0) * 100)) if p_row['Jump Height'] > 0 else 0
+        s_vel = min(100, int((p_row['Max Speed (mph)'] / 23.0) * 100)) if p_row['Max Speed (mph)'] > 0 else 50
+        s_pow = min(100, int((p_row['Explosive Yardage'] / 800.0) * 100)) if p_row['Explosive Yardage'] > 0 else 50
+        s_for = min(100, int((p_row['mRSI'] / 0.80) * 100)) if p_row['mRSI'] > 0 else 50
+        s_cap = min(100, int((p_row['Total Player Load'] / 650.0) * 100)) if p_row['Total Player Load'] > 0 else 50
+        s_vrt = min(100, int((p_row['Jump Height'] / 20.0) * 100)) if p_row['Jump Height'] > 0 else 50
         
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(
@@ -321,16 +228,16 @@ elif page == "Page 3: Individual Athlete Diagnostic":
         st.plotly_chart(fig, use_container_width=True)
         
     with col2:
-        st.subheader("🏈 NFL Model Comparison Profile")
-        nfl_comp = "Deebo Samuel Archetype" if p_row['Position Group']=='Skill' else "Fred Warner Archetype" if p_row['Position Group']=='Mid' else "Chris Jones Archetype"
-        st.metric("🎯 NFL Player Model Matching:", nfl_comp)
-        st.info("👉 **Coaching Directive:** Maintain dynamic training capacity metrics.")
-
-    st.divider()
-    st.subheader("📈 Athlete Volume Trend Curves")
-    fig_jh = px.line(p_hist, x='Week', y='Jump Height History', title="Weekly Vertical Neuromuscular Output Tracking")
-    fig_jh.update_traces(line_color='#800000', line_width=4)
-    st.plotly_chart(fig_jh, use_container_width=True)
+        st.subheader("📊 Multi-Tech Athlete Metrics Capture")
+        st.write(f"**Position Group:** {p_row['Position Group']} ({p_row['Position']})")
+        st.divider()
+        cx1, cx2 = st.columns(2)
+        cx1.metric("Perch VBT Power", f"{p_row['Peak Power (W)']} W")
+        cx2.metric("NordBord Imbalance", f"{p_row['Imbalance (%)']}%")
+        st.divider()
+        cx3, cx4 = st.columns(2)
+        cx3.metric("1080 Peak Speed", f"{p_row['Peak Speed (mph)']} mph")
+        cx4.metric("Hawkins mRSI", f"{p_row['mRSI']}")
 
 # --- PAGE 4: SUMMER 2026 TARGET TRACKING ---
 elif page == "Page 4: Summer 2026 Target Tracking":
@@ -338,9 +245,9 @@ elif page == "Page 4: Summer 2026 Target Tracking":
     st.divider()
     
     targets = {
-        'Skill': {'Dist_Target': 5500, 'Explosive_Target': 650, 'Actual_Dist': int(gps_df[gps_df['Position Group']=='Skill']['Total Distance (y)'].mean()), 'Actual_Explosive': int(gps_df[gps_df['Position Group']=='Skill']['Explosive Yardage'].mean())},
-        'Mid': {'Dist_Target': 4200, 'Explosive_Target': 300, 'Actual_Dist': int(gps_df[gps_df['Position Group']=='Mid']['Total Distance (y)'].mean()), 'Actual_Explosive': int(gps_df[gps_df['Position Group']=='Mid']['Explosive Yardage'].mean())},
-        'Big': {'Dist_Target': 2600, 'Explosive_Target': 80, 'Actual_Dist': int(gps_df[gps_df['Position Group']=='Big']['Total Distance (y)'].mean()), 'Actual_Explosive': int(gps_df[gps_df['Position Group']=='Big']['Explosive Yardage'].mean())}
+        'Skill': {'Dist_Target': 5500, 'Explosive_Target': 650, 'Actual_Dist': int(working_df[working_df['Position Group']=='Skill']['Total Distance (y)'].mean()), 'Actual_Explosive': int(working_df[working_df['Position Group']=='Skill']['Explosive Yardage'].mean())},
+        'Mid': {'Dist_Target': 4200, 'Explosive_Target': 300, 'Actual_Dist': int(working_df[working_df['Position Group']=='Mid']['Total Distance (y)'].mean()), 'Actual_Explosive': int(working_df[working_df['Position Group']=='Mid']['Explosive Yardage'].mean())},
+        'Big': {'Dist_Target': 2600, 'Explosive_Target': 80, 'Actual_Dist': int(working_df[working_df['Position Group']=='Big']['Total Distance (y)'].mean()), 'Actual_Explosive': int(working_df[working_df['Position Group']=='Big']['Explosive Yardage'].mean())}
     }
     for group, metrics in targets.items():
         st.markdown(f"#### **{group.upper()} TIER PERFORMANCE PROFILE**")
@@ -379,3 +286,4 @@ elif page == "Page 5: Tactical Practice Planner":
             cx2.metric("Estimated Player Load", int(plan_df['Total Load Calc'].sum()))
             cx3.metric("Estimated Distance", f"{int(plan_df['Total Dist Calc'].sum())} yds")
             st.dataframe(plan_df, use_container_width=True, hide_index=True)
+            
