@@ -6,7 +6,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # -----------------------------------------------------------------------------
-# CORE CONFIGURATION FILE TARGETS
+# CORE CONFIGURATION FILE TARGETS (LOCKED TO YOUR EXACT NAMING)
 # -----------------------------------------------------------------------------
 ROSTER_FILE = "Name KEy Football APP.csv"
 DATABASE_FILE = "Aggie Database.xlsx"
@@ -115,14 +115,14 @@ if os.path.exists(DATABASE_FILE):
     try:
         xl = pd.ExcelFile(DATABASE_FILE)
         
-        # Hardcoded sports science tabs matching your specs exactly
+        # Pure Hardcoded Sheet Mappings From Your Specifications
         df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
         df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
         df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
         df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
         df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
         
-        # Gather all logged dates present across spreadsheets
+        # Build selection menu strictly off unique values in the Date column
         all_logged_dates = []
         for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
             if not current_df.empty and 'Date' in current_df.columns:
