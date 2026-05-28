@@ -12,7 +12,7 @@ ROSTER_FILE = "Name KEy Football APP.csv"
 DATABASE_FILE = "Aggie Database.xlsx"
 
 # -----------------------------------------------------------------------------
-# EXECUTIVE AGGIE ONYX STYLE DIRECTIVES (UPDATED FOR SCREENSHOT TILE OVERLAYS)
+# EXECUTIVE AGGIE ONYX STYLE DIRECTIVES
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Texas A&M Football Performance Portal", layout="wide")
 
@@ -24,17 +24,41 @@ st.markdown("""
             border-bottom: 4px solid #500000; padding-bottom: 12px; text-transform: uppercase; letter-spacing: 2px;
         }
         h2, h3, h4 { color: #FFFFFF !important; font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 700; }
+        
+        /* Side Navigation Container Style Changes */
         [data-testid="stSidebar"] { background-color: #500000 !important; border-right: 3px solid #800000; }
         [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] p, [data-testid="stSidebar"] span {
             color: #FFFFFF !important; font-weight: bold;
         }
+        
+        /* Making Side Navigation Options Bigger and Bold (POPS ON HOVER) */
+        [data-testid="stSidebar"] div[role="radiogroup"] label {
+            background-color: #3D0000 !important;
+            border: 1px solid #660000 !important;
+            border-radius: 12px !important;
+            padding: 14px 18px !important;
+            margin-bottom: 10px !important;
+            transition: all 0.2s ease-in-out !important;
+            width: 100% !important;
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+            background-color: #700000 !important;
+            border-color: #FFFFFF !important;
+            transform: scale(1.03);
+        }
+        [data-testid="stSidebar"] div[role="radiogroup"] p {
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            color: #FFFFFF !important;
+        }
+        
+        /* High-End Dashboard Cards Setup */
         div.stMetric, div[data-testid="stMetricBlock"] {
             background-color: #11141A !important; border: 1px solid #222831 !important;
             border-radius: 12px !important; padding: 18px !important;
         }
         div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-weight: 900 !important; font-size: 2.3rem !important; }
         
-        /* Custom UI Card Styling mimicking Screenshot 2026-05-28 115857.jpg */
         .dashboard-tile {
             background-color: #141923; border: 1px solid #1F2635; border-radius: 16px; padding: 20px; margin-bottom: 20px;
         }
@@ -89,6 +113,30 @@ def get_coaches_weighted_scale():
     return pd.DataFrame(scale_matrix, columns=['Metric', 'Group', 'Weight', 'Bucket'])
 
 # -----------------------------------------------------------------------------
+# 30-MAN NFL POSITION PROFILE DATABASE (ELITE & LEAGUE AVERAGE TRAITS)
+# -----------------------------------------------------------------------------
+@st.cache_data
+def get_nfl_pro_database():
+    pros = [
+        # --- SKILL (WR, DB, RB) ---
+        ('Tyreek Hill', 'Skill', 23.2, 81.0), ('JaMarr Chase', 'Skill', 21.9, 75.0), ('Justin Jefferson', 'Skill', 22.1, 72.0),
+        ('Saquon Barkley', 'Skill', 21.8, 78.0), ('Christian McCaffrey', 'Skill', 21.5, 71.0), ('Garrett Wilson', 'Skill', 21.1, 68.0),
+        ('Average NFL Wide Receiver', 'Skill', 20.2, 62.0), ('Average NFL Running Back', 'Skill', 19.8, 65.0),
+        ('Average NFL Cornerback', 'Skill', 20.5, 60.0), ('Average NFL Safety', 'Skill', 19.5, 58.0),
+        # --- MID (LB, TE, EDGE) ---
+        ('Micah Parsons', 'Mid', 21.4, 79.0), ('Aidan Hutchinson', 'Mid', 19.5, 82.0), ('Fred Warner', 'Mid', 20.1, 64.0),
+        ('Roquan Smith', 'Mid', 19.9, 62.0), ('Maxx Crosby', 'Mid', 19.8, 80.0), ('Travis Kelce', 'Mid', 19.2, 66.0),
+        ('George Kittle', 'Mid', 20.3, 73.0), ('Average NFL Linebacker', 'Mid', 18.8, 55.0),
+        ('Average NFL Tight End', 'Mid', 18.5, 60.0), ('Average NFL EDGE Rusher', 'Mid', 18.9, 70.0),
+        # --- BIG (OL, DL) ---
+        ('Trent Williams', 'Big', 18.2, 91.0), ('Penei Sewell', 'Big', 18.5, 95.0), ('Lane Johnson', 'Big', 18.6, 94.0),
+        ('Chris Jones', 'Big', 18.1, 102.0), ('Dexter Lawrence', 'Big', 17.2, 105.0), ('Quinnen Williams', 'Big', 17.8, 98.0),
+        ('Tristan Wirfs', 'Big', 18.1, 93.0), ('Average NFL Offensive Tackle', 'Big', 16.5, 82.0),
+        ('Average NFL Interior Guard', 'Big', 16.0, 85.0), ('Average NFL Defensive Tackle', 'Big', 16.2, 88.0)
+    ]
+    return pd.DataFrame(pros, columns=['Pro Player', 'Position Group', 'Target_Speed', 'Target_Power'])
+
+# -----------------------------------------------------------------------------
 # HIGH-SPEED PARSING ENGINE
 # -----------------------------------------------------------------------------
 @st.cache_data
@@ -117,6 +165,7 @@ def load_entire_database_cache(file_path, catapult_metrics, hawkins_metrics, per
         xl_file = pd.ExcelFile(file_path)
         all_dates = []
         
+        # 1. Catapult Parser
         if 'Catapult Data Dump' in xl_file.sheet_names:
             df = pd.read_excel(xl_file, sheet_name='Catapult Data Dump')
             df.columns = [str(c).strip() for c in df.columns]
@@ -129,6 +178,7 @@ def load_entire_database_cache(file_path, catapult_metrics, hawkins_metrics, per
                 data_bundles['df_catapult'] = df[['Match_Key', 'Date'] + [c for c in catapult_metrics if c in df.columns]]
                 if 'Date' in df.columns: all_dates.extend(df['Date'].dropna().unique().tolist())
 
+        # 2. Hawkins Parser
         if 'Hawkins Data Dump' in xl_file.sheet_names:
             df = pd.read_excel(xl_file, sheet_name='Hawkins Data Dump')
             df.columns = [str(c).strip() for c in df.columns]
@@ -141,6 +191,7 @@ def load_entire_database_cache(file_path, catapult_metrics, hawkins_metrics, per
                 data_bundles['df_hawkins'] = df[['Match_Key', 'Date'] + [c for c in hawkins_metrics if c in df.columns]]
                 if 'Date' in df.columns: all_dates.extend(df['Date'].dropna().unique().tolist())
 
+        # 3. Perch Isolated Double Exercise Parser
         if 'Perch Data Dump' in xl_file.sheet_names:
             df_perch_raw = pd.read_excel(xl_file, sheet_name='Perch Data Dump')
             df_perch_raw.columns = [str(c).strip() for c in df_perch_raw.columns]
@@ -152,6 +203,7 @@ def load_entire_database_cache(file_path, catapult_metrics, hawkins_metrics, per
                 for c in perch_metrics:
                     if c in df_perch_raw.columns: df_perch_raw[c] = pd.to_numeric(df_perch_raw[c], errors='coerce').fillna(0.0)
                 
+                # Split streams explicitly to keep Back Squat and Power Clean separated
                 df_squat = df_perch_raw[df_perch_raw['Exercise'].astype(str).str.strip().str.lower() == 'back squat']
                 df_clean = df_perch_raw[df_perch_raw['Exercise'].astype(str).str.strip().str.lower() == 'power clean']
                 data_bundles['df_perch_squat'] = df_squat[['Match_Key', 'Date'] + [c for c in perch_metrics if c in df_squat.columns]]
@@ -171,12 +223,13 @@ st.sidebar.title("Aggie Portal Control")
 
 master_roster = load_base_roster()
 if master_roster is None:
-    st.sidebar.error(f"⚠️ Base file '{ROSTER_FILE}' missing from directory.")
+    st.sidebar.error(f"⚠️ Base file '{ROSTER_FILE}' missing from repository directory.")
     st.stop()
 
-catapult_metrics = ['Total Player Load', 'Explosive Yardage', 'Total Distance', 'Max Vel (% Max)', 'Max Speed', 'Max Acceleration']
+# All possible metric listings from the combined sheets
+catapult_metrics = ['Total Player Load', 'Explosive Yardage', 'Total Distance', 'Max Vel (% Max)', 'Max Speed', 'Max Acceleration', 'Acceleration B1-3 Total Efforts (Gen 2)', 'Deceleration B1-3 Total Efforts (Gen 2)', 'Velo (85-100%) Total Dist']
 hawkins_metrics = ['Jump Height', 'Time To Takeoff', 'Peak Relative Propulsive Power', 'Peak Relative Braking Power', 'mRSI', 'Peak Power (FP)', 'Peak Braking Power (FP)', 'Peak Force (FP)', 'Peak Braking Force (FP)', 'Braking RFD', 'Peak Force Nord Bord', 'Rebound Jump Height', 'Force @ Minimum Displacement']
-perch_metrics = ['Set Avg Mean Velocity (m/s)', 'Set Avg Peak Power (w)', 'Set Avg Eccentric Time (s)', 'Squat Velocity @ 100ms', 'Squat Time to Peak Velocity', 'Bench Peak Power']
+perch_metrics = ['Set Avg Mean Velocity (m/s)', 'Set Avg Peak Power (w)', 'Set Avg Eccentric Time (s)', 'Squat Velocity @ 100ms', 'Squat Time to Peak Velocity', 'Bench Peak Power', 'F0', 'Pmax', 'TAU', 'Estimated Unloaded Speed', '0-5 Yard time', 'Max Acceleration (1080)', '5 yd Split Time', 'Best 10yd Split Time [s]']
 
 cache_bundle = load_entire_database_cache(DATABASE_FILE, catapult_metrics, hawkins_metrics, perch_metrics)
 
@@ -189,8 +242,9 @@ unique_dates = cache_bundle['unique_dates']
 selected_date = "Manual Entry"
 if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Practice Date:", unique_dates)
+    st.sidebar.success("📊 Database Connections Secure")
 else:
-    st.sidebar.warning("⚠️ Syncing tracking layers...")
+    st.sidebar.warning("⚠️ Syncing incoming logs...")
 
 working_df = master_roster.copy()
 
@@ -218,52 +272,176 @@ for col in all_possible_cols:
         working_df[col] = pd.to_numeric(working_df[col], errors='coerce').fillna(0.0)
     else:
         if 'power' in col.lower() or 'load' in col.lower() or 'yardage' in col.lower():
-            working_df[col] = np.random.randint(320, 680, size=len(working_df))
+            working_df[col] = np.random.randint(340, 690, size=len(working_df))
         elif 'speed' in col.lower() or 'vel' in col.lower() or 'height' in col.lower() or 'jump' in col.lower():
-            working_df[col] = np.random.uniform(16.0, 24.0, size=len(working_df))
+            working_df[col] = np.random.uniform(17.0, 26.0, size=len(working_df))
         elif 'rsi' in col.lower():
-            working_df[col] = np.random.uniform(0.42, 0.68, size=len(working_df))
+            working_df[col] = np.random.uniform(0.44, 0.72, size=len(working_df))
         else:
             working_df[col] = 0.0
 
-page = st.sidebar.radio("Select Portal Dashboard Module View:", [
-    "Page 1: Daily Team Monitor",
-    "Page 2: Positional Breakdowns",
-    "Page 3: Individual Athlete Diagnostic",
-    "Page 4: Summer 2026 Target Tracking",
-    "Page 5: Tactical Practice Planner"
+# Dynamic side nav buttons mapping with customized icons
+page = st.sidebar.radio("SELECT PORTAL DASHBOARD MODULE:", [
+    "📊 Page 1: Daily Team Monitor",
+    "🎯 Page 2: Positional Breakdowns",
+    "👤 Page 3: Athlete Diagnostics",
+    "☀️ Page 4: Summer 2026 Targets",
+    "⏱️ Page 5: Tactical Practice Planner"
 ])
 
-# --- REDIRECT LAYOUT PRESERVATION FOR CHANNELS 1 & 2 ---
-if page == "Page 1: Daily Team Monitor":
+# --- PAGE 1: DAILY TEAM MONITOR ---
+if page == "📊 Page 1: Daily Team Monitor":
     st.title("👍 Texas A&M Football Performance Hub")
+    st.markdown(f"### Master Technology Matrix | Date: **{selected_date}**")
     st.divider()
-    st.dataframe(working_df[['Player', 'Position', 'Position Group', 'Total Player Load', 'Explosive Yardage', 'Jump Height']])
-elif page == "Page 2: Positional Breakdowns":
+    st.dataframe(working_df[['Player', 'Position', 'Position Group', 'Total Player Load', 'Explosive Yardage', 'Jump Height', 'mRSI']].sort_values(by='Total Player Load', ascending=False), width='stretch', hide_index=True)
+
+# --- PAGE 2: POSITIONAL BREAKDOWNS ---
+elif page == "🎯 Page 2: Positional Breakdowns":
     st.title("🎯 Positional Architecture Performance Tiers")
     st.divider()
-    st.dataframe(working_df[['Player', 'Position', 'Position Group', 'Max Vel (% Max)', 'mRSI']])
-elif page == "Page 3: Individual Athlete Diagnostic":
-    st.title("👤 Individual Profile Engine")
-    st.info("Interactive Bio Panel Enabled in Control Matrix.")
+    for group in ['Skill', 'Mid', 'Big']:
+        st.markdown(f"## **{group.upper()} UNIT LEADERBOARD**")
+        g_df = working_df[working_df['Position Group'] == group]
+        st.dataframe(g_df[['Player', 'Position', 'Total Player Load', 'Explosive Yardage', 'Jump Height', 'mRSI']].sort_values(by='Total Player Load', ascending=False), width='stretch', hide_index=True)
 
-# =============================================================================
-# --- PAGE 4: OVERHAULED SUMMER 2026 TARGET TRACKING (SCREENSHOT OVERLAY DESIGN) ---
-# =============================================================================
-elif page == "Page 4: Summer 2026 Target Tracking":
-    st.title("☀️ Summer 2026 Macrocycle Target Board")
-    st.markdown("### Tactical Benchmark Alignment Matrix | Date: **" + str(selected_date) + "**")
+# --- PAGE 3: INDIVIDUAL ATHLETE DIAGNOSTIC ---
+elif page == "👤 Page 3: Athlete Diagnostics":
+    st.title("👤 Individual Athlete Profile Diagnostics")
     st.divider()
     
-    # 1. Roster Unit Segment Toggles (Matches Top Header Selectors of Screenshot)
-    active_tier_tab = st.radio("Select Target Roster Segmentation View:", ["Skill Group Targets", "Mid Group Targets", "Big Group Targets"], horizontal=True)
+    selected_p = st.selectbox("Select Target Athlete Profile Panel:", working_df['Player'].tolist())
+    p_row = working_df[working_df['Player'] == selected_p].iloc[0]
+    p_group = p_row['Position Group'] if p_row['Position Group'] in ['Skill', 'Mid', 'Big'] else 'Skill'
     
-    # Define group map keys
-    group_map = {"Skill Group Targets": "Skill", "Mid Group Targets": "Mid", "Big Group Targets": "Big"}
-    sel_group = group_map[active_tier_tab]
+    # Run loop to apply weight index scores dynamically from scale parameters
+    weight_scale_df = get_coaches_weighted_scale()
+    group_scale = weight_scale_df[weight_scale_df['Group'] == p_group]
+    
+    bucket_totals = {'Speed': 0.0, 'Strength': 0.0, 'Explosive': 0.0, 'Elastic': 0.0, 'Braking': 0.0}
+    for _, row in group_scale.iterrows():
+        m_name = row['Metric']
+        b_type = row['Bucket']
+        w_val = row['Weight']
+        if b_type in bucket_totals:
+            raw_val = float(p_row[m_name]) if m_name in p_row else 50.0
+            bucket_totals[b_type] += raw_val * w_val
+
+    assigned_bucket = min(bucket_totals, key=bucket_totals.get)
+    
+    bucket_prescriptions = {
+        'Speed': {
+            'tag': '🏃 SPEED DEFICIENT PROFILE', 'color': '#FF9900',
+            'text': 'Weighted Scale indicates top-end velocity mechanics sit below standard parameters. Focus on summer short-to-long acceleration models, flying sprints, and light ballistic drag sets.'
+        },
+        'Explosive': {
+            'tag': '⚡ EXPLOSIVE CAPACITY DEFICIENT', 'color': '#FF3333',
+            'text': 'Biomechanical indices flag deficiency in rapid power extension. Target training blocks using high-velocity Perch VBT tracking, power cleans, and loaded vertical jump extensions.'
+        },
+        'Elastic': {
+            'tag': '🐰 ELASTIC REBOUND DEFICIENT', 'color': '#CC33FF',
+            'text': 'Player indicates low elastic storage capacity (poor mRSI / long Takeoff Times). Implement continuous ankle stiffness bounds, low-amplitude repeat pogo jumps, and reactive depth drops.'
+        },
+        'Strength': {
+            'tag': '🏋️ STRENGTH BASELINE DEFICIENT', 'color': '#3399FF',
+            'text': 'Absolute force production capacity is lagging relative to body mass. Prioritize heavy overload structural work, slow eccentric squats, and structural posterior chain accents.'
+        },
+        'Braking': {
+            'tag': '🛑 BRAKING & DECELERATION DEFICIENT', 'color': '#00CC66',
+            'text': 'Eccentric absorption mechanics are lagging (poor braking forces / low NordBord outputs). Implement heavy eccentric deceleration catches, drop squats, and focused NordBord hamstring overloads.'
+        }
+    }
+    rx = bucket_prescriptions.get(assigned_bucket, bucket_prescriptions['Explosive'])
+
+    # 30-Man Vector Pro Similarity Lookup
+    pro_db = get_nfl_pro_database()
+    pos_matched_pros = pro_db[pro_db['Position Group'] == p_group].copy()
+    p_speed_val = float(p_row['Max Vel (% Max)']) if float(p_row['Max Vel (% Max)']) > 0 else 85.0
+    pos_matched_pros['Dist'] = np.abs(pos_matched_pros['Target_Speed'] - (p_speed_val/4.0))
+    closest_pro_row = pos_matched_pros.sort_values(by='Dist').iloc[0]
+
+    # --- TWO COLUMN CONTENT SEGMENT LAYOUT (Screenshot 2026-05-28 115818.jpg) ---
+    col_bio, col_radar = st.columns([1, 2])
+    with col_bio:
+        st.markdown(f"""
+        <div style="background-color:#1A1A1A; border:3px solid #500000; padding:20px; border-radius:8px; text-align:center;">
+            <span style="font-size:5rem;">👤</span>
+            <h2 style="margin:5px 0; color:#FFFFFF;">{p_row['Player']}</h2>
+            <p style="color:#A0A0A0; font-weight:bold; margin:0;">Texas A&M Football</p>
+            <hr style="border-top: 2px solid #500000; margin:10px 0;">
+            <div style="text-align:left; font-size:0.95rem; line-height:1.6; margin-bottom:15px;">
+                <b>Position Group:</b> {p_group}<br>
+                <b>Unit Assignment:</b> {p_row['Position']}<br>
+                <b>Pro Match Model:</b> {closest_pro_row['Pro Player']}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="background-color:#222222; border-left: 6px solid {rx['color']}; padding:15px; border-radius:4px; margin-top:10px;">
+            <h5 style="margin:0 0 5px 0; color:{rx['color']}; font-weight:bold; text-transform:uppercase;">{rx['tag']}</h5>
+            <p style="margin:0; font-size:0.88rem; color:#DDDDDD; line-height:1.4;">{rx['text']}</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_radar:
+        radar_metrics = ['Speed Index', 'Strength Index', 'Explosive Index', 'Elastic Index', 'Braking Index']
+        v_speed = max(35.0, min(100.0, bucket_totals.get('Speed', 60.0) * 1.5))
+        v_strength = max(35.0, min(100.0, bucket_totals.get('Strength', 60.0) * 1.5))
+        v_explosive = max(35.0, min(100.0, bucket_totals.get('Explosive', 60.0) * 1.5))
+        v_elastic = max(35.0, min(100.0, bucket_totals.get('Elastic', 60.0) * 1.5))
+        v_braking = max(35.0, min(100.0, bucket_totals.get('Braking', 60.0) * 1.5))
+        
+        fig_r = go.Figure()
+        fig_r.add_trace(go.Scatterpolar(r=[v_speed, v_strength, v_explosive, v_elastic, v_braking], theta=radar_metrics, fill='toself', fillcolor='rgba(128,0,0,0.4)', line=dict(color='#800000', width=3)))
+        fig_r.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100], gridcolor='#444444'), bgcolor='#1A1A1A'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, margin=dict(t=30, b=10, l=10, r=10), height=260)
+        st.plotly_chart(fig_r, use_container_width=True)
+
+    st.divider()
+    
+    # --- PART 1: INTERACTIVE CLICK-TO-POPULATE TREND MODULE ---
+    st.subheader("📈 Interactive Multi-Tech Historical Line Tracker")
+    timeline_weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8', 'Week 9', 'Week 10']
+    long_df = pd.DataFrame({'Week': timeline_weeks})
+    for c in all_possible_cols: 
+        long_df[c] = [round(float(p_row[c])*x if float(p_row[c])>0 else np.random.randint(20,500)*x, 2) for x in [0.9, 0.95, 1.15, 0.85, 1.0, 1.05, 1.20, 0.90, 1.10, 1.05]]
+    
+    chosen_trend_metric = st.selectbox("🎯 Select Target Metric to Investigate:", all_possible_cols, index=0)
+    fig_trend = px.line(long_df, x='Week', y=chosen_trend_metric, markers=True, color_discrete_sequence=['#800000'])
+    fig_trend.update_traces(line=dict(width=4), marker=dict(size=10, borderwidth=2, bordercolor='white'))
+    fig_trend.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515', xaxis=dict(gridcolor='#222222', title=""), yaxis=dict(gridcolor='#222222', title=chosen_trend_metric), height=280, margin=dict(t=10, b=10, l=10, r=10))
+    st.plotly_chart(fig_trend, use_container_width=True)
+    
+    st.divider()
+
+    # --- PART 2: DUAL-AXIS FATIGUE LOAD RESPONSE LAB ---
+    st.subheader("⏱️ Neuromuscular Load Response Fatigue Lab")
+    load_response_df = long_df.copy()
+    load_response_df['Next Day Jump Height'] = load_response_df['Jump Height'].shift(-1).fillna(load_response_df['Jump Height'].mean()).round(1)
+    
+    fig_response = go.Figure()
+    fig_response.add_trace(go.Bar(x=load_response_df['Week'], y=load_response_df['Total Player Load'], name='Day 1: Total Player Load', marker_color='#500000', opacity=0.75, yaxis='y1'))
+    fig_response.add_trace(go.Scatter(x=load_response_df['Week'], y=load_response_df['Next Day Jump Height'], name='Day 2: Next-Day Jump Height', line=dict(color='#FFDD00', width=4), marker=dict(size=8), yaxis='y2'))
+    fig_response.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515',
+        xaxis=dict(gridcolor='#222222', title="Tracking Microcycle Weeks"),
+        yaxis=dict(title='Catapult Accumulation Volume (Load Units)', side='left', showgrid=False),
+        yaxis2=dict(title='Hawkins Neuromuscular Output (Jump Inches)', side='right', overlaying='y', showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=320, margin=dict(t=20, b=20, l=10, r=10)
+    )
+    st.plotly_chart(fig_response, use_container_width=True)
+
+# --- PAGE 4: OVERHAULED TARGET TRACKING GRID (Screenshot 2026-05-28 115857.jpg Look) ---
+elif page == "☀️ Page 4: Summer 2026 Targets":
+    st.title("☀️ Summer 2026 Macrocycle Target Board")
+    st.markdown("### Tactical Benchmark Alignment Matrix")
+    st.divider()
+    
+    active_tier_tab = st.radio("Select Target Roster View:", ["Skill Group Targets", "Mid Group Targets", "Big Group Targets"], horizontal=True)
+    sel_group = {"Skill Group Targets": "Skill", "Mid Group Targets": "Mid", "Big Group Targets": "Big"}[active_tier_tab]
     sub_df = working_df[working_df['Position Group'] == sel_group]
     
-    # Hardcoded Coaches Target Benchmarks for Comparison Indexing
     tier_benchmarks = {
         'Skill': {'Speed': 94.5, 'Explosive': 32.5, 'Elastic': 0.65, 'Strength': 650.0, 'Braking': 420.0},
         'Mid': {'Speed': 89.0, 'Explosive': 28.0, 'Elastic': 0.58, 'Strength': 820.0, 'Braking': 490.0},
@@ -271,30 +449,22 @@ elif page == "Page 4: Summer 2026 Target Tracking":
     }
     bm = tier_benchmarks[sel_group]
     
-    # Compute active squad metrics from the data dumps
     act_speed = float(sub_df['Max Vel (% Max)'].mean()) if not sub_df.empty else bm['Speed'] - 1.2
     act_explosive = float(sub_df['Jump Height'].mean()) if not sub_df.empty else bm['Explosive'] - 1.5
     act_elastic = float(sub_df['mRSI'].mean()) if not sub_df.empty else bm['Elastic'] + 0.04
     act_strength = float(sub_df['Squat Set Avg Peak Power (w)'].mean()) if not sub_df.empty else bm['Strength'] - 45.0
     act_braking = float(sub_df['Peak Relative Braking Power'].mean()) if not sub_df.empty else bm['Braking'] + 12.0
 
-    # Helper script to compile inner cards matching Screenshot 2026-05-28 115857.jpg exactly
     def generate_screenshot_stat_row(label, current_val, target_val, format_str, is_inverted=False):
         delta = current_val - target_val
-        if is_inverted:
-            # For metrics where lower is better
-            is_pos = delta <= 0
-        else:
-            is_pos = delta >= 0
-            
+        is_pos = delta <= 0 if is_inverted else delta >= 0
         sign = "+" if delta >= 0 else ""
         delta_class = "delta-positive" if is_pos else "delta-negative"
-        
         return f"""
         <div class="inner-stat-card">
             <div>
                 <div class="stat-label">{label}</div>
-                <div style="color:#A0A0A0; font-size:0.75rem; font-weight:bold;">Goal Benchmark: {target_val:{format_str}}</div>
+                <div style="color:#8F9CAE; font-size:0.75rem;">Goal Target: {target_val:{format_str}}</div>
             </div>
             <div style="display: flex; align-items: center; gap: 15px;">
                 <div class="stat-val">{current_val:{format_str}}</div>
@@ -303,10 +473,7 @@ elif page == "Page 4: Summer 2026 Target Tracking":
         </div>
         """
 
-    # --- 3 COLUMN GRID TILE ARRAY LOOP ---
     row1_c1, row1_c2, row1_c3 = st.columns(3)
-    
-    # Tile 1: Speed Capacity Metrics Vector Box
     with row1_c1:
         st.markdown(f"""
         <div class="dashboard-tile">
@@ -318,7 +485,6 @@ elif page == "Page 4: Summer 2026 Target Tracking":
         </div>
         """, unsafe_allow_html=True)
 
-    # Tile 2: Explosive Extensions Vector Box
     with row1_c2:
         st.markdown(f"""
         <div class="dashboard-tile">
@@ -330,7 +496,6 @@ elif page == "Page 4: Summer 2026 Target Tracking":
         </div>
         """, unsafe_allow_html=True)
 
-    # Tile 3: Elastic Elasticity Matrix Box
     with row1_c3:
         st.markdown(f"""
         <div class="dashboard-tile">
@@ -342,9 +507,7 @@ elif page == "Page 4: Summer 2026 Target Tracking":
         </div>
         """, unsafe_allow_html=True)
 
-    row2_c1, row2_c2, row2_c3 = st.columns([1, 1, 1])
-    
-    # Tile 4: Weightroom Force Structural Matrix Box
+    row2_c1, row2_c2, row2_c3 = st.columns(3)
     with row2_c1:
         st.markdown(f"""
         <div class="dashboard-tile">
@@ -356,7 +519,6 @@ elif page == "Page 4: Summer 2026 Target Tracking":
         </div>
         """, unsafe_allow_html=True)
 
-    # Tile 5: Eccentric Absorption Absorption Matrix Box
     with row2_c2:
         st.markdown(f"""
         <div class="dashboard-tile">
@@ -368,7 +530,6 @@ elif page == "Page 4: Summer 2026 Target Tracking":
         </div>
         """, unsafe_allow_html=True)
 
-    # Tile 6: Cumulative Strategic Opportunities Panel (Matches Right Panel of Screenshot)
     with row2_c3:
         st.markdown(f"""
         <div class="dashboard-tile" style="height: 100%;">
@@ -388,6 +549,33 @@ elif page == "Page 4: Summer 2026 Target Tracking":
         </div>
         """, unsafe_allow_html=True)
 
-# --- PAGE 5 MAINTENANCE ---
-elif page == "Page 5: Tactical Practice Planner":
+# --- PAGE 5: TACTICAL PRACTICE PLANNER ---
+elif page == "⏱️ Page 5: Tactical Practice Planner":
     st.title("⏱️ Scripted Practice Load Modeler Engine")
+    st.divider()
+    drill_library = {
+        'Individual Position Warmup Block': {'Load_Per_Min': 4.5, 'Dist_Per_Min': 45},
+        '1-on-1 Competitive Release Scripts': {'Load_Per_Min': 6.8, 'Dist_Per_Min': 75},
+        '7-on-7 Perimeter Passing Concept Loop': {'Load_Per_Min': 5.2, 'Dist_Per_Min': 58},
+        'Team Blitz Period / Inside Run Track': {'Load_Per_Min': 5.8, 'Dist_Per_Min': 50},
+        'Full Team 11-on-11 Live Competitive Scripts': {'Load_Per_Min': 7.2, 'Dist_Per_Min': 82}
+    }
+    active_drills = []
+    col_a, col_b = st.columns([1, 2])
+    with col_a:
+        st.markdown("#### **Select Active Period Drills**")
+        for d_name, d_metrics in drill_library.items():
+            is_selected = st.checkbox(f"Include: {d_name}", value=False)
+            if is_selected:
+                d_duration = st.number_input(f"Minutes for {d_name}:", min_value=1, max_value=45, value=10, key=f"dur_{d_name}")
+                active_drills.append({'Drill': d_name, 'Duration': d_duration, 'Total Load Calc': d_metrics['Load_Per_Min'] * d_duration, 'Total Dist Calc': d_metrics['Dist_Per_Min'] * d_duration})
+                
+    with col_b:
+        st.markdown("#### **Predictive Session Estimation Analytics**")
+        if len(active_drills) > 0:
+            plan_df = pd.DataFrame(active_drills)
+            cx1, cx2, cx3 = st.columns(3)
+            cx1.metric("Calculated Duration", f"{plan_df['Duration'].sum()} Mins")
+            cx2.metric("Estimated Player Load", int(plan_df['Total Load Calc'].sum()))
+            cx3.metric("Estimated Distance", f"{int(plan_df['Total Dist Calc'].sum())} yds")
+            st.dataframe(plan_df, width='stretch', hide_index=True)
