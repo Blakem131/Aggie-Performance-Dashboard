@@ -66,10 +66,8 @@ def load_central_sheet_tab(xl_file, sheet_name, target_cols):
         rename_map = {}
         for col in df.columns:
             c_low = col.lower().strip()
-            if c_low in ['name', 'player', 'athlete', 'player name']: 
-                rename_map[col] = 'Player'
-            elif c_low in ['date', 'activity date', 'start date', 'day']: 
-                rename_map[col] = 'Date'
+            if c_low in ['name', 'player', 'athlete', 'player name']: rename_map[col] = 'Player'
+            elif c_low == 'date': rename_map[col] = 'Date'
             else:
                 for tc in target_cols:
                     if c_low == tc.lower().strip():
@@ -80,11 +78,7 @@ def load_central_sheet_tab(xl_file, sheet_name, target_cols):
             return pd.DataFrame()
             
         df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
-        
-        if 'Date' in df.columns:
-            df['Date'] = df['Date'].astype(str).str.split().str[0].str.strip()
-        else:
-            df['Date'] = "Manual Entry"
+        df['Date'] = df['Date'].astype(str).str.strip() if 'Date' in df.columns else "Manual Entry"
         
         for tc in target_cols:
             if tc in df.columns:
@@ -121,7 +115,7 @@ if os.path.exists(DATABASE_FILE):
     try:
         xl = pd.ExcelFile(DATABASE_FILE)
         
-        # Exact Hardcoded Sheet Name Locks Matching Desktop Labels Exactly
+        # EXACT TAB LOCKS MATCHING YOUR DESKTOP SHEET PERFECTLY
         df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
         df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
         df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
@@ -142,10 +136,10 @@ if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", unique_dates)
     st.sidebar.success("📊 Database Centralized File: Connected & Live")
 else:
-    st.sidebar.warning("⚠️ Syncing data elements... App initializing.")
+    st.sidebar.warning("⚠️ Syncing data elements... Dashboard will populate shortly.")
     df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-# Combine separate technology sheets onto your master roster map
+# Combine separate technology sheets onto your master roster canvas map
 working_df = master_roster.copy()
 
 def slice_and_merge(base_df, source_df, cols, date_val):
