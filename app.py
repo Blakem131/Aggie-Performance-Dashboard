@@ -109,26 +109,27 @@ sprint_cols = ['Distance (m)', 'Peak Speed (mph)', 'Peak Power (W)', 'Avg Force 
 force_cols = ['Jump Height', 'mRSI']
 
 unique_dates = []
-selected_date = "System Simulation Mode"
+selected_date = "Manual Entry"
 
 if os.path.exists(DATABASE_FILE):
     try:
         xl = pd.ExcelFile(DATABASE_FILE)
         
-        # EXACT TAB LOCKS MATCHING YOUR DESKTOP SHEET PERFECTLY
+        # Pure Hardcoded Sheet Mappings Built Directly From Your Specifications
         df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
         df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
         df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
         df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
         df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
         
+        # Accumulate absolute dates present across tracking logs
         all_logged_dates = []
         for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
             if not current_df.empty and 'Date' in current_df.columns:
-                all_logged_dates.extend(current_df['Date'].unique().tolist())
+                all_logged_dates.extend(current_df['Date'].dropna().unique().tolist())
                 
+        all_logged_dates = [str(d).strip() for d in all_logged_dates if str(d).strip() != "Manual Entry" and ('/' in str(d) or '-' in str(d))]
         unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
-        if "Manual Entry" in unique_dates: unique_dates.remove("Manual Entry")
     except:
         pass
 
