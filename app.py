@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 # CORE CONFIGURATION FILE TARGETS
 # -----------------------------------------------------------------------------
 ROSTER_FILE = "Name KEy Football APP.csv"
-DATABASE_FILE = "Aggie_Master_Database.xlsx"
+DATABASE_FILE = "Aggie Database.xlsx"
 
 # -----------------------------------------------------------------------------
 # EXECUTIVE AGGIE ONYX STYLE DIRECTIVES
@@ -115,26 +115,26 @@ if os.path.exists(DATABASE_FILE):
     try:
         xl = pd.ExcelFile(DATABASE_FILE)
         
-        # Pure Hardcoded Sheet Mappings Built Directly From Your Specifications
+        # Hardcoded sports science tabs matching your specs exactly
         df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
         df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
         df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
         df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
         df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
         
-        # Accumulate absolute dates present across tracking logs
+        # Gather all logged dates present across spreadsheets
         all_logged_dates = []
         for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
             if not current_df.empty and 'Date' in current_df.columns:
                 all_logged_dates.extend(current_df['Date'].dropna().unique().tolist())
                 
-        all_logged_dates = [str(d).strip() for d in all_logged_dates if str(d).strip() != "Manual Entry" and ('/' in str(d) or '-' in str(d))]
         unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
+        if "Manual Entry" in unique_dates: unique_dates.remove("Manual Entry")
     except:
         pass
 
 if len(unique_dates) > 0:
-    selected_date = st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", unique_dates)
+    selected_date = st.sidebar.selectbox("🎯 Select Practice Date:", unique_dates)
     st.sidebar.success("📊 Database Centralized File: Connected & Live")
 else:
     st.sidebar.warning("⚠️ Syncing data elements... Dashboard will populate shortly.")
