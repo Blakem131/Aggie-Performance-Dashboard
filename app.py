@@ -113,28 +113,43 @@ def get_coaches_weighted_scale():
     return pd.DataFrame(scale_matrix, columns=['Metric', 'Group', 'Weight', 'Bucket'])
 
 # -----------------------------------------------------------------------------
-# 30-MAN NFL POSITION PROFILE DATABASE (ELITE & LEAGUE AVERAGE TRAITS)
+# RECALIBRATED NFL POSITION ARCHITECTURE DATABASE
 # -----------------------------------------------------------------------------
 @st.cache_data
 def get_nfl_pro_database():
     pros = [
-        # --- SKILL (WR, DB, RB) ---
-        ('Tyreek Hill', 'Skill', 23.2, 81.0), ('JaMarr Chase', 'Skill', 21.9, 75.0), ('Justin Jefferson', 'Skill', 22.1, 72.0),
-        ('Saquon Barkley', 'Skill', 21.8, 78.0), ('Christian McCaffrey', 'Skill', 21.5, 71.0), ('Garrett Wilson', 'Skill', 21.1, 68.0),
-        ('Average NFL Wide Receiver', 'Skill', 20.2, 62.0), ('Average NFL Running Back', 'Skill', 19.8, 65.0),
-        ('Average NFL Cornerback', 'Skill', 20.5, 60.0), ('Average NFL Safety', 'Skill', 19.5, 58.0),
-        # --- MID (LB, TE, EDGE) ---
-        ('Micah Parsons', 'Mid', 21.4, 79.0), ('Aidan Hutchinson', 'Mid', 19.5, 82.0), ('Fred Warner', 'Mid', 20.1, 64.0),
-        ('Roquan Smith', 'Mid', 19.9, 62.0), ('Maxx Crosby', 'Mid', 19.8, 80.0), ('Travis Kelce', 'Mid', 19.2, 66.0),
-        ('George Kittle', 'Mid', 20.3, 73.0), ('Average NFL Linebacker', 'Mid', 18.8, 55.0),
-        ('Average NFL Tight End', 'Mid', 18.5, 60.0), ('Average NFL EDGE Rusher', 'Mid', 18.9, 70.0),
-        # --- BIG (OL, DL) ---
-        ('Trent Williams', 'Big', 18.2, 91.0), ('Penei Sewell', 'Big', 18.5, 95.0), ('Lane Johnson', 'Big', 18.6, 94.0),
-        ('Chris Jones', 'Big', 18.1, 102.0), ('Dexter Lawrence', 'Big', 17.2, 105.0), ('Quinnen Williams', 'Big', 17.8, 98.0),
-        ('Tristan Wirfs', 'Big', 18.1, 93.0), ('Average NFL Offensive Tackle', 'Big', 16.5, 82.0),
-        ('Average NFL Interior Guard', 'Big', 16.0, 85.0), ('Average NFL Defensive Tackle', 'Big', 16.2, 88.0)
+        ('Creed Humphrey', 'OL', 'Center', 17.4, 880),
+        ('Tyler Linderbaum', 'OL', 'Center', 17.9, 860),
+        ('Average NFL Center', 'OL', 'Center', 17.1, 820),
+        ('Zack Martin', 'OL', 'Guard', 17.5, 940),
+        ('Joe Thuney', 'OL', 'Guard', 17.3, 910),
+        ('Average NFL Guard', 'OL', 'Guard', 16.8, 860),
+        ('Trent Williams', 'OL', 'Tackle', 18.2, 1010),
+        ('Penei Sewell', 'OL', 'Tackle', 18.5, 990),
+        ('Lane Johnson', 'OL', 'Tackle', 18.6, 1020),
+        ('Average NFL Tackle', 'OL', 'Tackle', 17.2, 920),
+        ('Dexter Lawrence', 'DL', 'DT', 17.2, 1050),
+        ('Chris Jones', 'DL', 'DT', 18.1, 1020),
+        ('Average NFL Defensive Tackle', 'DL', 'DT', 16.5, 880),
+        ('Nick Bosa', 'DE', 'Edge', 19.7, 850),
+        ('Maxx Crosby', 'DE', 'Edge', 19.8, 820),
+        ('Aidan Hutchinson', 'DE', 'Edge', 19.5, 840),
+        ('Average NFL Defensive End', 'DE', 'Edge', 18.9, 760),
+        ('Micah Parsons', 'LB', 'Linebacker', 21.4, 790),
+        ('Fred Warner', 'LB', 'Linebacker', 20.1, 680),
+        ('Average NFL Linebacker', 'LB', 'Linebacker', 19.2, 610),
+        ('Tyreek Hill', 'WR', 'Receiver', 23.2, 780),
+        ('Justin Jefferson', 'WR', 'Receiver', 22.1, 710),
+        ('Average NFL Receiver', 'WR', 'Receiver', 20.5, 620),
+        ('Saquon Barkley', 'RB', 'Running Back', 21.8, 810),
+        ('Christian McCaffrey', 'RB', 'Running Back', 21.5, 740),
+        ('Average NFL Running Back', 'RB', 'Running Back', 19.9, 660),
+        ('Kyle Hamilton', 'SAF', 'Safety', 20.8, 640),
+        ('Average NFL Safety', 'SAF', 'Safety', 19.6, 590),
+        ('Sauce Gardner', 'CB', 'Cornerback', 21.3, 580),
+        ('Average NFL Cornerback', 'CB', 'Cornerback', 20.4, 560)
     ]
-    return pd.DataFrame(pros, columns=['Pro Player', 'Position Group', 'Target_Speed', 'Target_Power'])
+    return pd.DataFrame(pros, columns=['Pro Player', 'POS_Group', 'Specific_POS', 'Target_Speed', 'Target_Power'])
 
 # -----------------------------------------------------------------------------
 # HIGH-SPEED PARSING ENGINE
@@ -152,7 +167,6 @@ def load_base_roster():
     except:
         return None
 
-# Optimization Cache: Locks simulated values into memory ONCE to eliminate calculation lag
 @st.cache_data(ttl=300)
 def generate_stabilized_performance_cache(roster_keys, all_possible_cols):
     np.random.seed(42)
@@ -209,7 +223,6 @@ def load_entire_database_cache(file_path, catapult_metrics, hawkins_metrics, per
             df_perch_raw = pd.read_excel(xl_file, sheet_name='Perch Data Dump')
             df_perch_raw.columns = [str(c).strip() for c in df_perch_raw.columns]
             df_perch_raw = df_perch_raw.rename(columns={'Name': 'Player', 'Player Name': 'Player', 'Athlete': 'Player'})
-            
             if 'Player' in df_perch_raw.columns and 'Exercise' in df_perch_raw.columns:
                 df_perch_raw['Match_Key'] = df_perch_raw['Player'].astype(str).str.strip().str.upper()
                 df_perch_raw['Date'] = df_perch_raw['Date'].astype(str).str.strip() if 'Date' in df_perch_raw.columns else "Manual Entry"
@@ -238,12 +251,14 @@ if master_roster is None:
     st.sidebar.error(f"⚠️ Base file '{ROSTER_FILE}' missing from directory.")
     st.stop()
 
-catapult_metrics = ['Total Player Load', 'Explosive Yardage', 'Total Distance', 'Max Vel (% Max)', 'Max Speed', 'Max Acceleration']
-hawkins_metrics = ['Jump Height', 'Time To Takeoff', 'Peak Relative Propulsive Power', 'Peak Relative Braking Power', 'mRSI', 'Peak Power (FP)', 'Peak Braking Power (FP)', 'Peak Force (FP)', 'Peak Braking Force (FP)', 'Braking RFD', 'Peak Force Nord Bord', 'Rebound Jump Height', 'Force @ Minimum Displacement']
-perch_metrics = ['Set Avg Mean Velocity (m/s)', 'Set Avg Peak Power (w)', 'Set Avg Eccentric Time (s)', 'Squat Velocity @ 100ms', 'Squat Time to Peak Velocity', 'Bench Peak Power', 'F0', 'Pmax', 'TAU', 'Estimated Unloaded Speed', '0-5 Yard time', 'Max Acceleration (1080)', '5 yd Split Time', 'Best 10yd Split Time [s]']
-all_possible_cols = catapult_metrics + hawkins_metrics + ["Squat "+c for c in perch_metrics] + ["Clean "+c for c in perch_metrics]
+# Define explicitly requested metrics by company block
+catapult_dropdown_list = ['Total Player Load', 'Explosive Yardage', 'Total Distance', 'Max Vel (% Max)', 'Max Speed', 'Max Acceleration', 'Acceleration B1-3 Total Efforts (Gen 2)', 'Deceleration B1-3 Total Efforts (Gen 2)', 'Velo (85-100%) Total Dist']
+hawkins_dropdown_list = ['Jump Height', 'Time To Takeoff', 'Peak Relative Propulsive Power', 'Peak Relative Braking Power', 'mRSI', 'Peak Power (FP)', 'Peak Braking Power (FP)', 'Peak Force (FP)', 'Peak Braking Force (FP)', 'Braking RFD', 'Peak Force Nord Bord', 'Rebound Jump Height', 'Force @ Minimum Displacement']
+perch_dropdown_list = ['Squat Set Avg Mean Velocity (m/s)', 'Squat Set Avg Peak Power (w)', 'Squat Set Avg Eccentric Time (s)', 'Squat Velocity @ 100ms', 'Squat Time to Peak Velocity', 'Bench Peak Power', 'Clean Set Avg Mean Velocity (m/s)', 'Clean Set Avg Peak Power (w)', 'Clean Set Avg Eccentric Time (s)', 'F0', 'Pmax', 'TAU', 'Estimated Unloaded Speed', '0-5 Yard time', 'Max Acceleration (1080)', '5 yd Split Time', 'Best 10yd Split Time [s]']
 
-cache_bundle = load_entire_database_cache(DATABASE_FILE, catapult_metrics, hawkins_metrics, perch_metrics)
+all_possible_cols = list(set(catapult_dropdown_list + hawkins_dropdown_list + perch_dropdown_list))
+
+cache_bundle = load_entire_database_cache(DATABASE_FILE, catapult_dropdown_list, hawkins_dropdown_list, ['Set Avg Mean Velocity (m/s)', 'Set Avg Peak Power (w)', 'Set Avg Eccentric Time (s)'])
 
 df_catapult = cache_bundle['df_catapult']
 df_hawkins = cache_bundle['df_hawkins']
@@ -273,12 +288,11 @@ def slice_and_merge(base_df, source_df, cols, date_val, prefix=""):
         sub_df = sub_df.rename(columns={c: prefix+c for c in cols if c in sub_df.columns})
     return base_df.merge(sub_df, on='Match_Key', how='left')
 
-working_df = slice_and_merge(working_df, df_catapult, catapult_metrics, selected_date)
-working_df = slice_and_merge(working_df, df_hawkins, hawkins_metrics, selected_date)
-working_df = slice_and_merge(working_df, df_squat, perch_metrics, selected_date, prefix="Squat ")
-working_df = slice_and_merge(working_df, df_clean, perch_metrics, selected_date, prefix="Clean ")
+working_df = slice_and_merge(working_df, df_catapult, catapult_dropdown_list, selected_date)
+working_df = slice_and_merge(working_df, df_hawkins, hawkins_dropdown_list, selected_date)
+working_df = slice_and_merge(working_df, df_squat, ['Set Avg Mean Velocity (m/s)', 'Set Avg Peak Power (w)', 'Set Avg Eccentric Time (s)'], selected_date, prefix="Squat ")
+working_df = slice_and_merge(working_df, df_clean, ['Set Avg Mean Velocity (m/s)', 'Set Avg Peak Power (w)', 'Set Avg Eccentric Time (s)'], selected_date, prefix="Clean ")
 
-# Rapid RAM Stream Bypass: Loads placeholders from single-pass matrix to avoid lagging loops
 simulated_backing_df = generate_stabilized_performance_cache(working_df['Match_Key'].tolist(), all_possible_cols)
 
 for col in all_possible_cols:
@@ -336,31 +350,30 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     assigned_bucket = min(bucket_totals, key=bucket_totals.get)
     
     bucket_prescriptions = {
-        'Speed': {
-            'tag': '🏃 SPEED DEFICIENT PROFILE', 'color': '#FF9900',
-            'text': 'Weighted Scale indicates top-end velocity mechanics sit below standard parameters. Focus on summer short-to-long acceleration models, flying sprints, and light ballistic drag sets.'
-        },
-        'Explosive': {
-            'tag': '⚡ EXPLOSIVE CAPACITY DEFICIENT', 'color': '#FF3333',
-            'text': 'Biomechanical indices flag deficiency in rapid power extension. Target training blocks using high-velocity Perch VBT tracking, power cleans, and loaded vertical jump extensions.'
-        },
-        'Elastic': {
-            'tag': '🐰 ELASTIC REBOUND DEFICIENT', 'color': '#CC33FF',
-            'text': 'Player indicates low elastic storage capacity (poor mRSI / long Takeoff Times). Implement continuous ankle stiffness bounds, low-amplitude repeat pogo jumps, and reactive depth drops.'
-        },
-        'Strength': {
-            'tag': '🏋️ STRENGTH BASELINE DEFICIENT', 'color': '#3399FF',
-            'text': 'Absolute force production capacity is lagging relative to body mass. Prioritize heavy overload structural work, slow eccentric squats, and structural posterior chain accents.'
-        },
-        'Braking': {
-            'tag': '🛑 BRAKING & DECELERATION DEFICIENT', 'color': '#00CC66',
-            'text': 'Eccentric absorption mechanics are lagging (poor braking forces / low NordBord outputs). Implement heavy eccentric deceleration catches, drop squats, and focused NordBord hamstring overloads.'
-        }
+        'Speed': {'tag': '🏃 SPEED DEFICIENT PROFILE', 'color': '#FF9900', 'text': 'Weighted Scale indicates top-end velocity mechanics sit below standard parameters. Focus on summer short-to-long acceleration models and flying sprints.'},
+        'Explosive': {'tag': '⚡ EXPLOSIVE CAPACITY DEFICIENT', 'color': '#FF3333', 'text': 'Biomechanical indices flag deficiency in rapid power extension. Target training blocks using high-velocity Perch VBT tracking and power cleans.'},
+        'Elastic': {'tag': '🐰 ELASTIC REBOUND DEFICIENT', 'color': '#CC33FF', 'text': 'Player indicates low elastic storage capacity (poor mRSI / long Takeoff Times). Implement continuous ankle stiffness bounds and pogo jumps.'},
+        'Strength': {'tag': '🏋️ STRENGTH BASELINE DEFICIENT', 'color': '#3399FF', 'text': 'Absolute force production capacity is lagging relative to body mass. Prioritize heavy overload structural work and slow eccentric squats.'},
+        'Braking': {'tag': '🛑 BRAKING & DECELERATION DEFICIENT', 'color': '#00CC66', 'text': 'Eccentric absorption mechanics are lagging. Implement heavy eccentric deceleration catches and focused NordBord hamstring overloads.'}
     }
     rx = bucket_prescriptions.get(assigned_bucket, bucket_prescriptions['Explosive'])
 
+    # --- ADVANCED ROLE-SPECIFIC NFL PRO LOOKUP ---
     pro_db = get_nfl_pro_database()
-    pos_matched_pros = pro_db[pro_db['Position Group'] == p_group].copy()
+    player_pos_raw = str(p_row['Position']).upper().strip()
+    
+    if player_pos_raw == 'OL':
+        if any(w in str(p_row['Player']).upper() for w in ['COEN', 'NABOU', 'MOSES', 'ROSEBOROUGH']):
+            pos_matched_pros = pro_db[(pro_db['POS_Group'] == 'OL') & (pro_db['Specific_POS'].isin(['Center', 'Guard']))].copy()
+        else:
+            pos_matched_pros = pro_db[(pro_db['POS_Group'] == 'OL') & (pro_db['Specific_POS'] == 'Tackle')].copy()
+    elif player_pos_raw == 'DL':
+        pos_matched_pros = pro_db[(pro_db['POS_Group'] == 'DL') & (pro_db['Specific_POS'] == 'DT')].copy()
+    elif player_pos_raw in ['DE', 'LB']:
+        pos_matched_pros = pro_db[pro_db['Specific_POS'].isin(['Edge', 'Linebacker'])].copy()
+    else:
+        pos_matched_pros = pro_db[~pro_db['POS_Group'].isin(['OL', 'DL', 'DE'])].copy()
+
     p_speed_val = float(p_row['Max Vel (% Max)']) if float(p_row['Max Vel (% Max)']) > 0 else 85.0
     pos_matched_pros['Dist'] = np.abs(pos_matched_pros['Target_Speed'] - (p_speed_val/4.0))
     closest_pro_row = pos_matched_pros.sort_values(by='Dist').iloc[0]
@@ -374,9 +387,9 @@ elif page == "👤 Page 3: Athlete Diagnostics":
             <p style="color:#A0A0A0; font-weight:bold; margin:0;">Texas A&M Football</p>
             <hr style="border-top: 2px solid #500000; margin:10px 0;">
             <div style="text-align:left; font-size:0.95rem; line-height:1.6; margin-bottom:15px;">
-                <b>Position Group:</b> {p_group}<br>
-                <b>Unit Assignment:</b> {p_row['Position']}<br>
-                <b>Pro Match Model:</b> {closest_pro_row['Pro Player']}
+                <b>Unit Classification:</b> {player_pos_raw}<br>
+                <b>Position Tier:</b> {p_group}<br>
+                <b>Specific Pro Match:</b> {closest_pro_row['Specific_POS']} ({closest_pro_row['Pro Player']})
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -403,18 +416,56 @@ elif page == "👤 Page 3: Athlete Diagnostics":
 
     st.divider()
     
-    # --- PART 1: INTERACTIVE CLICK-TO-POPULATE TREND MODULE ---
-    st.subheader("📈 Interactive Multi-Tech Historical Line Tracker")
+    # -------------------------------------------------------------------------
+    # PART 1: INTERACTIVE MULTI-TECH DUAL-AXIS TREND MODULE (CLEAN FIXED VERSION)
+    # -------------------------------------------------------------------------
+    st.subheader("📈 Interactive Multi-Tech Historical Dual-Axis Tracker")
+    st.markdown("Compare volume metrics against output responses over time. Pick one Catapult option for the left axis, and a Hawkins/Perch option for the right axis.")
+    
     timeline_weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8', 'Week 9', 'Week 10']
     long_df = pd.DataFrame({'Week': timeline_weeks})
     for c in all_possible_cols: 
         long_df[c] = [round(float(p_row[c])*x if float(p_row[c])>0 else np.random.randint(20,500)*x, 2) for x in [0.9, 0.95, 1.15, 0.85, 1.0, 1.05, 1.20, 0.90, 1.10, 1.05]]
     
-    chosen_trend_metric = st.selectbox("🎯 Select Target Metric to Investigate:", all_possible_cols, index=0)
-    fig_trend = px.line(long_df, x='Week', y=chosen_trend_metric, markers=True, color_discrete_sequence=['#800000'])
-    fig_trend.update_traces(line=dict(width=4), marker=dict(size=10, borderwidth=2, bordercolor='white'))
-    fig_trend.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515', xaxis=dict(gridcolor='#222222', title=""), yaxis=dict(gridcolor='#222222', title=chosen_trend_metric), height=280, margin=dict(t=10, b=10, l=10, r=10))
-    st.plotly_chart(fig_trend, use_container_width=True)
+    col_sel1, col_sel2 = st.columns(2)
+    with col_sel1:
+        chosen_left_axis = st.selectbox("🎯 Left Axis - Select Catapult Metric:", catapult_dropdown_list, index=3)
+    with col_sel2:
+        secondary_options_list = hawkins_dropdown_list + perch_dropdown_list
+        chosen_right_axis = st.selectbox("🎯 Right Axis - Select Hawkins/Perch Metric:", secondary_options_list, index=0)
+        
+    fig_dual = go.Figure()
+    # Left Axis Traces (Bars)
+    fig_dual.add_trace(go.Bar(
+        x=long_df['Week'], 
+        y=long_df[chosen_left_axis], 
+        name=f"Left: {chosen_left_axis}", 
+        marker_color='#500000', 
+        opacity=0.8, 
+        yaxis='y1'
+    ))
+    # Right Axis Traces (Line)
+    fig_dual.add_trace(go.Scatter(
+        x=long_df['Week'], 
+        y=long_df[chosen_right_axis], 
+        name=f"Right: {chosen_right_axis}", 
+        mode='lines+markers',
+        line=dict(color='#FFDD00', width=4), 
+        marker=dict(size=8, borderwidth=1, bordercolor='white'), 
+        yaxis='y2'
+    ))
+    
+    fig_dual.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', 
+        plot_bgcolor='#151515',
+        xaxis=dict(gridcolor='#222222', title="Microcycle Training Weeks"),
+        yaxis=dict(title=chosen_left_axis, side='left', showgrid=True, gridcolor='#333333'),
+        yaxis2=dict(title=chosen_right_axis, side='right', overlaying='y', showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=350, 
+        margin=dict(t=20, b=20, l=10, r=10)
+    )
+    st.plotly_chart(fig_dual, use_container_width=True)
     
     st.divider()
 
@@ -556,30 +607,3 @@ elif page == "☀️ Page 4: Summer 2026 Targets":
 # --- PAGE 5: TACTICAL PRACTICE PLANNER ---
 elif page == "⏱️ Page 5: Tactical Practice Planner":
     st.title("⏱️ Scripted Practice Load Modeler Engine")
-    st.divider()
-    drill_library = {
-        'Individual Position Warmup Block': {'Load_Per_Min': 4.5, 'Dist_Per_Min': 45},
-        '1-on-1 Competitive Release Scripts': {'Load_Per_Min': 6.8, 'Dist_Per_Min': 75},
-        '7-on-7 Perimeter Passing Concept Loop': {'Load_Per_Min': 5.2, 'Dist_Per_Min': 58},
-        'Team Blitz Period / Inside Run Track': {'Load_Per_Min': 5.8, 'Dist_Per_Min': 50},
-        'Full Team 11-on-11 Live Competitive Scripts': {'Load_Per_Min': 7.2, 'Dist_Per_Min': 82}
-    }
-    active_drills = []
-    col_a, col_b = st.columns([1, 2])
-    with col_a:
-        st.markdown("#### **Select Active Period Drills**")
-        for d_name, d_metrics in drill_library.items():
-            is_selected = st.checkbox(f"Include: {d_name}", value=False)
-            if is_selected:
-                d_duration = st.number_input(f"Minutes for {d_name}:", min_value=1, max_value=45, value=10, key=f"dur_{d_name}")
-                active_drills.append({'Drill': d_name, 'Duration': d_duration, 'Total Load Calc': d_metrics['Load_Per_Min'] * d_duration, 'Total Dist Calc': d_metrics['Dist_Per_Min'] * d_duration})
-                
-    with col_b:
-        st.markdown("#### **Predictive Session Estimation Analytics**")
-        if len(active_drills) > 0:
-            plan_df = pd.DataFrame(active_drills)
-            cx1, cx2, cx3 = st.columns(3)
-            cx1.metric("Calculated Duration", f"{plan_df['Duration'].sum()} Mins")
-            cx2.metric("Estimated Player Load", int(plan_df['Total Load Calc'].sum()))
-            cx3.metric("Estimated Distance", f"{int(plan_df['Total Dist Calc'].sum())} yds")
-            st.dataframe(plan_df, width='stretch', hide_index=True)
