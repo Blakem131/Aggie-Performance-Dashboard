@@ -54,7 +54,6 @@ def load_base_roster():
     except:
         return None
 
-@st.cache_data(ttl=30)
 def load_central_sheet_tab(xl_file, sheet_name, target_cols):
     try:
         if sheet_name not in xl_file.sheet_names:
@@ -88,7 +87,8 @@ def load_central_sheet_tab(xl_file, sheet_name, target_cols):
                 
         pull_cols = ['Match_Key', 'Date'] + [tc for tc in target_cols if tc in df.columns]
         return df[pull_cols]
-    except:
+    except Exception as e:
+        st.sidebar.error(f"Error reading tab [{sheet_name}]: {str(e)}")
         return pd.DataFrame()
 
 # -----------------------------------------------------------------------------
@@ -111,11 +111,15 @@ force_cols = ['Jump Height', 'mRSI']
 unique_dates = []
 selected_date = "System Simulation Mode"
 
+# SYSTEM PIPELINE DIAGNOSTICS ENGINE
+st.sidebar.markdown("### 🔍 System Live Status")
 if os.path.exists(DATABASE_FILE):
+    st.sidebar.info("✅ Excel Database File Found")
     try:
         xl = pd.ExcelFile(DATABASE_FILE)
+        st.sidebar.success(f"📂 Found Tabs: {xl.sheet_names}")
         
-        # Exact Hardcoded Sheet Name Locks Matching Your Desktop Setup
+        # Load sheets with exact name targets
         df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
         df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
         df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
@@ -123,20 +127,24 @@ if os.path.exists(DATABASE_FILE):
         df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
         
         all_logged_dates = []
-        for current_df in [df_gps, df_perch, df_nord, df_sprint, df_force]:
+        for name, current_df in [('GPS', df_gps), ('Force', df_force), ('Perch', df_perch), ('Sprint', df_sprint), ('NordBord', df_nord)]:
             if not current_df.empty and 'Date' in current_df.columns:
                 all_logged_dates.extend(current_df['Date'].unique().tolist())
+            else:
+                st.sidebar.write(f"⚠️ Tab '{name}' is empty or missing 'Name'/'Date' headers.")
                 
         unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
         if "Manual Entry" in unique_dates: unique_dates.remove("Manual Entry")
-    except:
-        pass
+    except Exception as e:
+        st.sidebar.error(f"❌ Error initializing Excel workbook: {str(e)}")
+else:
+    st.sidebar.error(f"❌ File '{DATABASE_FILE}' not found in GitHub directory.")
 
 if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", unique_dates)
     st.sidebar.success("📊 Database Centralized File: Connected & Live")
 else:
-    st.sidebar.warning("⚠️ Syncing data elements... Dashboard will populate shortly.")
+    st.sidebar.warning("⚠️ Syncing data elements... Check diagnostics above.")
     df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
 # Combine separate technology sheets onto your master roster map
