@@ -54,15 +54,15 @@ def load_base_roster():
     except:
         return None
 
-@st.cache_data(ttl=60)  # Checks for your fresh desktop uploads every single minute
-def load_central_sheet_tab(sheet_name, target_cols):
-    if not os.path.exists(DATABASE_FILE):
-        return pd.DataFrame()
+@st.cache_data(ttl=30)
+def load_central_sheet_tab(xl_file, sheet_name, target_cols):
     try:
-        df = pd.read_excel(DATABASE_FILE, sheet_name=sheet_name)
+        if sheet_name not in xl_file.sheet_names:
+            return pd.DataFrame()
+            
+        df = pd.read_excel(xl_file, sheet_name=sheet_name)
         df.columns = [str(c).strip() for c in df.columns]
         
-        # Standardize anchor name tracking systems
         rename_map = {}
         for col in df.columns:
             c_low = col.lower().strip()
@@ -80,7 +80,6 @@ def load_central_sheet_tab(sheet_name, target_cols):
         df['Match_Key'] = df['Player'].astype(str).str.strip().str.upper()
         df['Date'] = df['Date'].astype(str).str.strip() if 'Date' in df.columns else "Manual Entry"
         
-        # Enforce numeric arrays securely
         for tc in target_cols:
             if tc in df.columns:
                 df[tc] = pd.to_numeric(df[tc], errors='coerce').fillna(0.0)
@@ -109,29 +108,38 @@ nord_cols = ['Max Left Force (N)', 'Max Right Force (N)', 'Total Force (N)', 'Im
 sprint_cols = ['Distance (m)', 'Peak Speed (mph)', 'Peak Power (W)', 'Avg Force (N)']
 force_cols = ['Jump Height', 'mRSI']
 
-# Background Extraction Pipeline Execution
-df_gps = load_central_sheet_tab('GPS_Data', gps_cols)
-df_perch = load_central_sheet_tab('VBT_Perch', perch_cols)
-df_nord = load_central_sheet_tab('NordBord', nord_cols)
-df_sprint = load_central_sheet_tab('Sprint_1080', sprint_cols)
-df_force = load_central_sheet_tab('Force_Plates', force_cols)
+unique_dates = []
+selected_date = "System Simulation Mode"
 
-# Collect comprehensive session calendar dates directly out of your data logs
-all_logged_dates = []
-for current_df in [df_gps, df_perch, df_nord, df_sprint, df_force]:
-    if not current_df.empty and 'Date' in current_df.columns:
-        all_logged_dates.extend(current_df['Date'].unique().tolist())
+if os.path.exists(DATABASE_FILE):
+    try:
+        xl = pd.ExcelFile(DATABASE_FILE)
         
-unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
+        # Exact Hardcoded Sheet Name Locks Matching Your Desktop Setup
+        df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
+        df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
+        df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
+        df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
+        df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
+        
+        all_logged_dates = []
+        for current_df in [df_gps, df_perch, df_nord, df_sprint, df_force]:
+            if not current_df.empty and 'Date' in current_df.columns:
+                all_logged_dates.extend(current_df['Date'].unique().tolist())
+                
+        unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
+        if "Manual Entry" in unique_dates: unique_dates.remove("Manual Entry")
+    except:
+        pass
 
-if len(unique_dates) > 0 and unique_dates != ["Manual Entry"]:
+if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", unique_dates)
     st.sidebar.success("📊 Database Centralized File: Connected & Live")
 else:
-    selected_date = "System Simulation Mode"
-    st.sidebar.warning("⚠️ Syncing Base File... Check back in 30 seconds.")
+    st.sidebar.warning("⚠️ Syncing data elements... Dashboard will populate shortly.")
+    df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-# Combine separate technology sheets onto your master 106-athlete canvas map
+# Combine separate technology sheets onto your master roster map
 working_df = master_roster.copy()
 
 def slice_and_merge(base_df, source_df, cols, date_val):
@@ -139,6 +147,9 @@ def slice_and_merge(base_df, source_df, cols, date_val):
         for c in cols: base_df[c] = 0.0
         return base_df
     filtered = source_df[source_df['Date'] == date_val]
+    if filtered.empty:
+        for c in cols: base_df[c] = 0.0
+        return base_df
     return base_df.merge(filtered[['Match_Key'] + cols], on='Match_Key', how='left')
 
 working_df = slice_and_merge(working_df, df_gps, gps_cols, selected_date)
@@ -147,7 +158,6 @@ working_df = slice_and_merge(working_df, df_nord, nord_cols, selected_date)
 working_df = slice_and_merge(working_df, df_sprint, sprint_cols, selected_date)
 working_df = slice_and_merge(working_df, df_force, force_cols, selected_date)
 
-# Fast loop verification layout sweep to wipe out null cell errors
 all_metrics = gps_cols + perch_cols + nord_cols + sprint_cols + force_cols
 for metric in all_metrics:
     if metric in working_df.columns:
@@ -286,4 +296,3 @@ elif page == "Page 5: Tactical Practice Planner":
             cx2.metric("Estimated Player Load", int(plan_df['Total Load Calc'].sum()))
             cx3.metric("Estimated Distance", f"{int(plan_df['Total Dist Calc'].sum())} yds")
             st.dataframe(plan_df, use_container_width=True, hide_index=True)
-            
