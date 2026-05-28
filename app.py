@@ -121,28 +121,26 @@ if os.path.exists(DATABASE_FILE):
     try:
         xl = pd.ExcelFile(DATABASE_FILE)
         
-        # Exact Hardcoded Sheet Name Locks Matching Your Desktop Setup Exactly
+        # Exact Hardcoded Sheet Name Locks Matching Desktop Labels Exactly
         df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
         df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
         df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
         df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
         df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
         
-        # Gather all historical dates logged across all performance sheets
         all_logged_dates = []
         for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
             if not current_df.empty and 'Date' in current_df.columns:
-                all_logged_dates.extend(current_df['Date'].dropna().unique().tolist())
+                all_logged_dates.extend(current_df['Date'].unique().tolist())
                 
-        # Clean up data strings and sort chronologically
-        all_logged_dates = [str(d).strip() for d in all_logged_dates if str(d).strip() != "Manual Entry" and ('/' in str(d) or '-' in str(d))]
         unique_dates = sorted(list(set(all_logged_dates)), reverse=True)
+        if "Manual Entry" in unique_dates: unique_dates.remove("Manual Entry")
     except:
         pass
 
 if len(unique_dates) > 0:
-    selected_date = st.sidebar.selectbox("🎯 Select Training/Practice Date:", unique_dates)
-    st.sidebar.success("📊 Central Workbook: Connected & Live")
+    selected_date = st.sidebar.selectbox("🎯 Select Historical Practice Session Date:", unique_dates)
+    st.sidebar.success("📊 Database Centralized File: Connected & Live")
 else:
     st.sidebar.warning("⚠️ Syncing data elements... App initializing.")
     df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
@@ -154,7 +152,6 @@ def slice_and_merge(base_df, source_df, cols, date_val):
     if source_df.empty:
         for c in cols: base_df[c] = 0.0
         return base_df
-    # Filters directly by the specific calendar date selected
     filtered = source_df[source_df['Date'] == date_val]
     if filtered.empty:
         for c in cols: base_df[c] = 0.0
