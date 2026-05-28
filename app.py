@@ -39,7 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# MASTER DATA PARSING LOADER
+# HIGH-SPEED PARSING ENGINE (CACHED STRINGS RECOVERY)
 # -----------------------------------------------------------------------------
 @st.cache_data
 def load_base_roster():
@@ -54,14 +54,18 @@ def load_base_roster():
     except:
         return None
 
-# Adding a leading underscore to _xl_file instructs Streamlit to bypass parameter hashing
-@st.cache_data(ttl=10)
-def load_central_sheet_tab(_xl_file, sheet_name, target_cols):
+@st.cache_data(ttl=2)
+def load_central_sheet_tab(file_path, sheet_name, target_cols):
     try:
-        if sheet_name not in _xl_file.sheet_names:
+        if not os.path.exists(file_path):
+            return pd.DataFrame()
+        
+        # Load workbook via low-overhead string passing
+        xl_file = pd.ExcelFile(file_path)
+        if sheet_name not in xl_file.sheet_names:
             return pd.DataFrame()
             
-        df = pd.read_excel(_xl_file, sheet_name=sheet_name)
+        df = pd.read_excel(xl_file, sheet_name=sheet_name)
         df.columns = [str(c).strip() for c in df.columns]
         
         rename_map = {}
@@ -111,44 +115,52 @@ force_cols = ['Jump Height', 'mRSI']
 unique_dates = []
 selected_date = "Manual Entry"
 
-if os.path.exists(DATABASE_FILE):
-    try:
-        xl = pd.ExcelFile(DATABASE_FILE)
+df_gps = load_central_sheet_tab(DATABASE_FILE, 'Catapult Data Dump', gps_cols)
+df_force = load_central_sheet_tab(DATABASE_FILE, 'Hawkins Data Dump', force_cols)
+df_perch = load_central_sheet_tab(DATABASE_FILE, 'Perch Data Dump', perch_cols)
+df_sprint = load_central_sheet_tab(DATABASE_FILE, 'Sprint 1080 Data Dump', sprint_cols)
+df_nord = load_central_sheet_tab(DATABASE_FILE, 'NordBord Data Dump', nord_cols)
+
+for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
+    if not current_df.empty and 'Date' in current_df.columns:
+        unique_dates.extend(current_df['Date'].dropna().unique().tolist())
         
-        df_gps = load_central_sheet_tab(xl, 'Catapult Data Dump', gps_cols)
-        df_force = load_central_sheet_tab(xl, 'Hawkins Data Dump', force_cols)
-        df_perch = load_central_sheet_tab(xl, 'Perch Data Dump', perch_cols)
-        df_sprint = load_central_sheet_tab(xl, 'Sprint 1080 Data Dump', sprint_cols)
-        df_nord = load_central_sheet_tab(xl, 'NordBord Data Dump', nord_cols)
-        
-        for current_df in [df_gps, df_force, df_perch, df_sprint, df_nord]:
-            if not current_df.empty and 'Date' in current_df.columns:
-                unique_dates.extend(current_df['Date'].dropna().unique().tolist())
-                
-        unique_dates = list(set([str(d).strip() for d in unique_dates if str(d).strip() != "Manual Entry"]))
-        unique_dates = sorted(unique_dates, reverse=True)
-    except:
-        pass
+unique_dates = list(set([str(d).strip() for d in unique_dates if str(d).strip() != "Manual Entry"]))
+unique_dates = sorted(unique_dates, reverse=True)
 
 if len(unique_dates) > 0:
     selected_date = st.sidebar.selectbox("🎯 Select Practice Date:", unique_dates)
-    st.sidebar.success("📊 Database Centralized File: Connected & Live")
+    st.sidebar.success("📊 Connected Live")
 else:
-    st.sidebar.warning("⚠️ Syncing data elements... Dashboard will populate shortly.")
-    df_gps, df_perch, df_nord, df_sprint, df_force = pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    st.sidebar.warning("⚠️ Syncing files... Initializing database view panels.")
+    # Fallback to direct raw files if master index sheet is still caching on server
+    if os.path.exists('Blake Daily GPS.csv'):
+        df_gps = pd.read_csv('Blake Daily GPS.csv')
+        df_gps.columns = [str(c).strip() for c in df_gps.columns]
+        df_gps = df_gps.rename(columns={'Name': 'Player'})
+        df_gps['Match_Key'] = df_gps['Player'].astype(str).str.strip().str.upper()
+        df_gps['Date'] = df_gps['Date'].astype(str).str.strip()
+        unique_dates = sorted(list(df_gps['Date'].dropna().unique()), reverse=True)
+        if unique_dates:
+            selected_date = st.sidebar.selectbox("🎯 Select Practice Date:", unique_dates)
 
-# Clean merge step matching original behavior
+# Build unified roster matrix sheet
 working_df = master_roster.copy()
 
 def slice_and_merge(base_df, source_df, cols, date_val):
     if source_df.empty:
         for c in cols: base_df[c] = 0.0
         return base_df
+    # Match on standardized date format logic strings
     filtered = source_df[source_df['Date'] == date_val]
     if filtered.empty:
         for c in cols: base_df[c] = 0.0
         return base_df
-    return base_df.merge(filtered[['Match_Key'] + cols], on='Match_Key', how='left')
+    
+    # Strip duplicate values to avoid row multiplication
+    sub_df = filtered[['Match_Key'] + [c for c in cols if c in filtered.columns]].drop_duplicates(subset=['Match_Key'])
+    res = base_df.merge(sub_df, on='Match_Key', how='left')
+    return res
 
 working_df = slice_and_merge(working_df, df_gps, gps_cols, selected_date)
 working_df = slice_and_merge(working_df, df_perch, perch_cols, selected_date)
@@ -159,11 +171,11 @@ working_df = slice_and_merge(working_df, df_force, force_cols, selected_date)
 all_metrics = gps_cols + perch_cols + nord_cols + sprint_cols + force_cols
 for metric in all_metrics:
     if metric in working_df.columns:
-        working_df[metric] = working_df[metric].fillna(0.0).round(1)
+        working_df[metric] = pd.to_numeric(working_df[metric], errors='coerce').fillna(0.0).round(1)
     else:
         working_df[metric] = 0.0
 
-# Navigation Panel Options
+# 5-Page Navigation Hub
 page = st.sidebar.radio("Select Portal Dashboard Module View:", [
     "Page 1: Daily Team Monitor",
     "Page 2: Positional Breakdowns",
@@ -218,11 +230,13 @@ elif page == "Page 3: Individual Athlete Diagnostic":
     with col1:
         st.subheader("🕸️ Performance Capacity Spider Chart")
         categories = ['Velocity (Max Speed)', 'Power (Explosive Yds)', 'Force (mRSI)', 'Capacity (Player Load)', 'Vertical (Jump Height)']
-        s_vel = min(100, int((p_row['Max Speed (mph)'] / 23.0) * 100)) if p_row['Max Speed (mph)'] > 0 else 50
-        s_pow = min(100, int((p_row['Explosive Yardage'] / 800.0) * 100)) if p_row['Explosive Yardage'] > 0 else 50
-        s_for = min(100, int((p_row['mRSI'] / 0.80) * 100)) if p_row['mRSI'] > 0 else 50
-        s_cap = min(100, int((p_row['Total Player Load'] / 650.0) * 100)) if p_row['Total Player Load'] > 0 else 50
-        s_vrt = min(100, int((p_row['Jump Height'] / 20.0) * 100)) if p_row['Jump Height'] > 0 else 50
+        
+        # Guard math logic from collapsing into empty references
+        s_vel = min(100, int((float(p_row['Max Speed (mph)']) / 23.0) * 100)) if float(p_row['Max Speed (mph)']) > 0 else 45
+        s_pow = min(100, int((float(p_row['Explosive Yardage']) / 800.0) * 100)) if float(p_row['Explosive Yardage'] ) > 0 else 45
+        s_for = min(100, int((float(p_row['mRSI']) / 0.80) * 100)) if float(p_row['mRSI']) > 0 else 45
+        s_cap = min(100, int((float(p_row['Total Player Load']) / 650.0) * 100)) if float(p_row['Total Player Load']) > 0 else 45
+        s_vrt = min(100, int((float(p_row['Jump Height']) / 20.0) * 100)) if float(p_row['Jump Height']) > 0 else 45
         
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(
@@ -252,10 +266,15 @@ elif page == "Page 4: Summer 2026 Target Tracking":
     st.title("☀️ Summer 2026 Macrocycle Target Board")
     st.divider()
     
+    # Secure positional baseline means safely
+    s_group = working_df[working_df['Position Group']=='Skill']
+    m_group = working_df[working_df['Position Group']=='Mid']
+    b_group = working_df[working_df['Position Group']=='Big']
+    
     targets = {
-        'Skill': {'Dist_Target': 5500, 'Explosive_Target': 650, 'Actual_Dist': int(working_df[working_df['Position Group']=='Skill']['Total Distance (y)'].mean()), 'Actual_Explosive': int(working_df[working_df['Position Group']=='Skill']['Explosive Yardage'].mean())},
-        'Mid': {'Dist_Target': 4200, 'Explosive_Target': 300, 'Actual_Dist': int(working_df[working_df['Position Group']=='Mid']['Total Distance (y)'].mean()), 'Actual_Explosive': int(working_df[working_df['Position Group']=='Mid']['Explosive Yardage'].mean())},
-        'Big': {'Dist_Target': 2600, 'Explosive_Target': 80, 'Actual_Dist': int(working_df[working_df['Position Group']=='Big']['Total Distance (y)'].mean()), 'Actual_Explosive': int(working_df[working_df['Position Group']=='Big']['Explosive Yardage'].mean())}
+        'Skill': {'Dist_Target': 5500, 'Explosive_Target': 650, 'Actual_Dist': int(s_group['Total Distance (y)'].mean()) if not s_group.empty else 0, 'Actual_Explosive': int(s_group['Explosive Yardage'].mean()) if not s_group.empty else 0},
+        'Mid': {'Dist_Target': 4200, 'Explosive_Target': 300, 'Actual_Dist': int(m_group['Total Distance (y)'].mean()) if not m_group.empty else 0, 'Actual_Explosive': int(m_group['Explosive Yardage'].mean()) if not m_group.empty else 0},
+        'Big': {'Dist_Target': 2600, 'Explosive_Target': 80, 'Actual_Dist': int(b_group['Total Distance (y)'].mean()) if not b_group.empty else 0, 'Actual_Explosive': int(b_group['Explosive Yardage'].mean()) if not b_group.empty else 0}
     }
     for group, metrics in targets.items():
         st.markdown(f"#### **{group.upper()} TIER PERFORMANCE PROFILE**")
