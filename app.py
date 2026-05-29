@@ -585,7 +585,8 @@ with c3:
 with c4:
     st.metric("Power Index", f"{power_index:.0f}%", f"Peak Power: {peak_power:.0f}")
 
-    st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+
 
     # -------------------------------------------------
     # MAIN DASHBOARD SECTION
