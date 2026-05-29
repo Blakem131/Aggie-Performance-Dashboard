@@ -571,17 +571,19 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     # -------------------------------------------------
     c1, c2, c3, c4 = st.columns(4)
 
-    with c1:
-        metric_tile("Speed Index", f"{speed_index:.0f}%", f"Max Speed: {max_speed:.1f}")
+c1, c2, c3, c4 = st.columns(4)
 
-    with c2:
-        metric_tile("Force Index", f"{force_index:.0f}%", f"Peak Force: {peak_force:.0f}", "#FFFFFF")
+with c1:
+    st.metric("Speed Index", f"{speed_index:.0f}%", f"Max Speed: {max_speed:.1f}")
 
-    with c3:
-        metric_tile("Strength Index", f"{strength_index:.0f}%", f"Squat Power: {squat_power:.0f} W")
+with c2:
+    st.metric("Force Index", f"{force_index:.0f}%", f"Peak Force: {peak_force:.0f}")
 
-    with c4:
-        metric_tile("Power Index", f"{power_index:.0f}%", f"Peak Power: {peak_power:.0f}", "#FFFFFF")
+with c3:
+    st.metric("Strength Index", f"{strength_index:.0f}%", f"Squat Power: {squat_power:.0f} W")
+
+with c4:
+    st.metric("Power Index", f"{power_index:.0f}%", f"Peak Power: {peak_power:.0f}")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
