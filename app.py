@@ -593,133 +593,145 @@ st.markdown("<br>", unsafe_allow_html=True)
     # -------------------------------------------------
 left, middle, right = st.columns([1.05, 1.65, 1.15])
 
+```python
+left, middle, right = st.columns([1.05, 1.65, 1.15])
+
 with left:
-        st.markdown("### Readiness Engine")
-        st.plotly_chart(build_readiness_gauge(readiness_score), use_container_width=True)
 
-        st.markdown(f"""
-        <div style="
-            background:#11141A;
-            border:1px solid #2A3140;
-            border-radius:16px;
-            padding:16px;">
+    st.markdown("### Readiness Engine")
 
-            <div style="color:#FFD700; font-weight:900; font-size:0.8rem;">
-                READINESS ANALYSIS
-            </div>
+    st.plotly_chart(
+        build_readiness_gauge(readiness_score),
+        use_container_width=True
+    )
 
-            <div style="color:white; font-size:1rem; font-weight:800; margin-top:6px;">
-                {readiness_status}
-            </div>
+    st.markdown(f"""
+    <div style="
+        background:#11141A;
+        border:1px solid #2A3140;
+        border-radius:16px;
+        padding:16px;">
 
-            <div style="color:#C9D0DA; font-size:0.9rem; line-height:1.45; margin-top:8px;">
-                {readiness_note}
-            </div>
+        <div style="color:#FFD700; font-weight:900; font-size:0.8rem;">
+            READINESS ANALYSIS
         </div>
-        """, unsafe_allow_html=True)
+
+        <div style="color:white; font-size:1rem; font-weight:800; margin-top:6px;">
+            {readiness_status}
+        </div>
+
+        <div style="color:#C9D0DA; font-size:0.9rem; line-height:1.45; margin-top:8px;">
+            {readiness_note}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 with middle:
-        st.markdown("### Historical Trend Tracker")
 
-        timeline_weeks = [
-            "Wk 1", "Wk 2", "Wk 3", "Wk 4",
-            "Wk 5", "Wk 6", "Wk 7", "Wk 8"
-        ]
+    st.markdown("### Historical Trend Tracker")
 
-        trend_df = pd.DataFrame({"Week": timeline_weeks})
+    timeline_weeks = [
+        "Wk 1", "Wk 2", "Wk 3", "Wk 4",
+        "Wk 5", "Wk 6", "Wk 7", "Wk 8"
+    ]
 
-        trend_df["Total Player Load"] = [
-            total_load * x for x in [0.85, 0.92, 1.05, 0.98, 1.15, 1.02, 0.95, 1.00]
-        ]
+    trend_df = pd.DataFrame({"Week": timeline_weeks})
 
-        trend_df["Jump Height"] = [
-            jump_height * x for x in [0.92, 0.95, 0.98, 0.96, 1.00, 1.02, 0.99, 1.00]
-        ]
+    trend_df["Total Player Load"] = [
+        total_load * x for x in [0.85, 0.92, 1.05, 0.98, 1.15, 1.02, 0.95, 1.00]
+    ]
 
-        trend_df["mRSI"] = [
-            mrsi * x for x in [0.90, 0.94, 0.96, 0.95, 1.00, 1.04, 1.02, 1.00]
-        ]
+    trend_df["Jump Height"] = [
+        jump_height * x for x in [0.92, 0.95, 0.98, 0.96, 1.00, 1.02, 0.99, 1.00]
+    ]
 
-        metric_choice = st.selectbox(
-            "Select Neuromuscular Metric:",
-            ["Jump Height", "mRSI"]
-        )
+    trend_df["mRSI"] = [
+        mrsi * x for x in [0.90, 0.94, 0.96, 0.95, 1.00, 1.04, 1.02, 1.00]
+    ]
 
-        fig_trend = go.Figure()
+    metric_choice = st.selectbox(
+        "Select Neuromuscular Metric:",
+        ["Jump Height", "mRSI"]
+    )
 
-        fig_trend.add_trace(go.Bar(
-            x=trend_df["Week"],
-            y=trend_df["Total Player Load"],
-            name="Total Player Load",
-            marker_color="#500000",
-            opacity=0.8,
-            yaxis="y1"
-        ))
+    fig_trend = go.Figure()
 
-        fig_trend.add_trace(go.Scatter(
-            x=trend_df["Week"],
-            y=trend_df[metric_choice],
-            name=metric_choice,
-            mode="lines+markers",
-            line=dict(color="#FFD700", width=4),
-            marker=dict(size=10, color="#FFD700"),
-            yaxis="y2"
-        ))
+    fig_trend.add_trace(go.Bar(
+        x=trend_df["Week"],
+        y=trend_df["Total Player Load"],
+        name="Total Player Load",
+        marker_color="#500000",
+        opacity=0.8,
+        yaxis="y1"
+    ))
 
-        fig_trend.update_layout(
-            height=390,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="#11141A",
-            font=dict(color="white"),
-            xaxis=dict(gridcolor="#252B36"),
-            yaxis=dict(
-                title="Player Load",
-                side="left",
-                gridcolor="#252B36"
-            ),
-            yaxis2=dict(
-                title=metric_choice,
-                overlaying="y",
-                side="right",
-                showgrid=False
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1
-            ),
-            margin=dict(t=30, b=30, l=20, r=20)
-        )
+    fig_trend.add_trace(go.Scatter(
+        x=trend_df["Week"],
+        y=trend_df[metric_choice],
+        name=metric_choice,
+        mode="lines+markers",
+        line=dict(color="#FFD700", width=4),
+        marker=dict(size=10, color="#FFD700"),
+        yaxis="y2"
+    ))
 
-        st.plotly_chart(fig_trend, use_container_width=True)
+    fig_trend.update_layout(
+        height=390,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#11141A",
+        font=dict(color="white"),
+        xaxis=dict(gridcolor="#252B36"),
+        yaxis=dict(
+            title="Player Load",
+            side="left",
+            gridcolor="#252B36"
+        ),
+        yaxis2=dict(
+            title=metric_choice,
+            overlaying="y",
+            side="right",
+            showgrid=False
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(t=30, b=30, l=20, r=20)
+    )
+
+    st.plotly_chart(fig_trend, use_container_width=True)
 
 with right:
-        st.markdown("### Athletic Profile")
 
-        radar_labels = [
-            "Max Speed",
-            "Jump Height",
-            "Peak Power",
-            "10yd Split",
-            "Peak mRSI"
-        ]
+    st.markdown("### Athletic Profile")
 
-        radar_values = [
-            speed_index,
-            index_score(jump_height, avg_jump),
-            power_index,
-            index_score(split_10, avg_split_10, higher_is_better=False),
-            elastic_index
-        ]
+    radar_labels = [
+        "Max Speed",
+        "Jump Height",
+        "Peak Power",
+        "10yd Split",
+        "Peak mRSI"
+    ]
 
-        st.plotly_chart(
-            build_radar_chart(radar_labels, radar_values),
-            use_container_width=True
-        )
+    radar_values = [
+        speed_index,
+        index_score(jump_height, avg_jump),
+        power_index,
+        index_score(split_10, group_avg("Best 10yd Split Time [s]"), higher_is_better=False),
+        index_score(mrsi, avg_mrsi)
+    ]
 
-    st.divider()
+    st.plotly_chart(
+        build_radar_chart(radar_labels, radar_values),
+        use_container_width=True
+    )
+
+st.divider()
+```
+
 
     # -------------------------------------------------
     # VBT HUB
