@@ -321,7 +321,6 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     "<div style='font-size:1.4rem; font-weight:900; color:#FFD700; margin-bottom:8px;'>TARGET ATHLETE PROFILE</div>",
     unsafe_allow_html=True
 )
-
 selected_p = st.selectbox(
     "Target Athlete Profile",
     working_df['Player'].tolist(),
@@ -421,7 +420,13 @@ selected_p = st.selectbox(
     
     chosen_trend_metric = st.selectbox("🎯 Select Target Metric to Investigate:", all_possible_cols, index=0)
     fig_trend = px.line(long_df, x='Week', y=chosen_trend_metric, markers=True, color_discrete_sequence=['#800000'])
-    fig_trend.update_traces(line=dict(width=4), marker=dict(size=10, borderwidth=2, bordercolor='white'))
+fig_trend.update_traces(
+    line=dict(width=4),
+    marker=dict(
+        size=10,
+        line=dict(width=2, color="white")
+    )
+)
     fig_trend.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515', xaxis=dict(gridcolor='#222222', title=""), yaxis=dict(gridcolor='#222222', title=chosen_trend_metric), height=280, margin=dict(t=10, b=10, l=10, r=10))
     st.plotly_chart(fig_trend, use_container_width=True)
     
