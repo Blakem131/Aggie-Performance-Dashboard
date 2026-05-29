@@ -866,8 +866,8 @@ elif page == "☀️ Page 4: Summer 2026 Targets":
         </div>
         """
 
-    row1_c1, row1_c2, row1_c3 = st.columns(3)
- with row1_c1:
+row1_c1, row1_c2, row1_c3 = st.columns(3)
+with row1_c1:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>🏃 SPEED CAPACITY MODULE</h4>
@@ -923,7 +923,7 @@ with row1_c3:
         </div>
         """, unsafe_allow_html=True)
 
- with row2_c3:
+with row2_c3:
         st.markdown(f"""
         <div class="dashboard-tile" style="height: 100%;">
             <h4>🎯 POSITION UNIT STRATEGIC OUTLOOK</h4>
