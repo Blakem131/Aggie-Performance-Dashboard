@@ -330,7 +330,7 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     )    
 
 
-)
+
     p_row = working_df[working_df['Player'] == selected_p].iloc[0]
     p_group = p_row['Position Group'] if p_row['Position Group'] in ['Skill', 'Mid', 'Big'] else 'Skill'
     
