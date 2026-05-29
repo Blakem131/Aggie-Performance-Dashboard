@@ -736,7 +736,7 @@ st.divider()
     # -------------------------------------------------
     # VBT HUB
     # -------------------------------------------------
-    st.markdown("## 🏋️ Velocity Based Training Hub")
+st.markdown("## 🏋️ Velocity Based Training Hub")
 
     v1, v2, v3 = st.columns(3)
 
@@ -867,7 +867,7 @@ elif page == "☀️ Page 4: Summer 2026 Targets":
         """
 
     row1_c1, row1_c2, row1_c3 = st.columns(3)
-    with row1_c1:
+ with row1_c1:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>🏃 SPEED CAPACITY MODULE</h4>
@@ -923,7 +923,7 @@ with row1_c3:
         </div>
         """, unsafe_allow_html=True)
 
-  with row2_c3:
+ with row2_c3:
         st.markdown(f"""
         <div class="dashboard-tile" style="height: 100%;">
             <h4>🎯 POSITION UNIT STRATEGIC OUTLOOK</h4>
@@ -955,7 +955,7 @@ elif page == "⏱️ Page 5: Tactical Practice Planner":
     }
     active_drills = []
     col_a, col_b = st.columns([1, 2])
-    with col_a:
+with col_a:
         st.markdown("#### **Select Active Period Drills**")
         for d_name, d_metrics in drill_library.items():
             is_selected = st.checkbox(f"Include: {d_name}", value=False)
@@ -963,7 +963,7 @@ elif page == "⏱️ Page 5: Tactical Practice Planner":
                 d_duration = st.number_input(f"Minutes for {d_name}:", min_value=1, max_value=45, value=10, key=f"dur_{d_name}")
                 active_drills.append({'Drill': d_name, 'Duration': d_duration, 'Total Load Calc': d_metrics['Load_Per_Min'] * d_duration, 'Total Dist Calc': d_metrics['Dist_Per_Min'] * d_duration})
                 
-    with col_b:
+with col_b:
         st.markdown("#### **Predictive Session Estimation Analytics**")
         if len(active_drills) > 0:
             plan_df = pd.DataFrame(active_drills)
