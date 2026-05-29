@@ -738,7 +738,7 @@ st.divider()
     # -------------------------------------------------
 st.markdown("## 🏋️ Velocity Based Training Hub")
 
-    v1, v2, v3 = st.columns(3)
+v1, v2, v3 = st.columns(3)
 
 with v1:
         metric_tile(
