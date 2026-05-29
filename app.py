@@ -113,30 +113,6 @@ def get_coaches_weighted_scale():
     return pd.DataFrame(scale_matrix, columns=['Metric', 'Group', 'Weight', 'Bucket'])
 
 # -----------------------------------------------------------------------------
-# 30-MAN NFL POSITION PROFILE DATABASE (ELITE & LEAGUE AVERAGE TRAITS)
-# -----------------------------------------------------------------------------
-@st.cache_data
-def get_nfl_pro_database():
-    pros = [
-        # --- SKILL (WR, DB, RB) ---
-        ('Tyreek Hill', 'Skill', 23.2, 81.0), ('JaMarr Chase', 'Skill', 21.9, 75.0), ('Justin Jefferson', 'Skill', 22.1, 72.0),
-        ('Saquon Barkley', 'Skill', 21.8, 78.0), ('Christian McCaffrey', 'Skill', 21.5, 71.0), ('Garrett Wilson', 'Skill', 21.1, 68.0),
-        ('Average NFL Wide Receiver', 'Skill', 20.2, 62.0), ('Average NFL Running Back', 'Skill', 19.8, 65.0),
-        ('Average NFL Cornerback', 'Skill', 20.5, 60.0), ('Average NFL Safety', 'Skill', 19.5, 58.0),
-        # --- MID (LB, TE, EDGE) ---
-        ('Micah Parsons', 'Mid', 21.4, 79.0), ('Aidan Hutchinson', 'Mid', 19.5, 82.0), ('Fred Warner', 'Mid', 20.1, 64.0),
-        ('Roquan Smith', 'Mid', 19.9, 62.0), ('Maxx Crosby', 'Mid', 19.8, 80.0), ('Travis Kelce', 'Mid', 19.2, 66.0),
-        ('George Kittle', 'Mid', 20.3, 73.0), ('Average NFL Linebacker', 'Mid', 18.8, 55.0),
-        ('Average NFL Tight End', 'Mid', 18.5, 60.0), ('Average NFL EDGE Rusher', 'Mid', 18.9, 70.0),
-        # --- BIG (OL, DL) ---
-        ('Trent Williams', 'Big', 18.2, 91.0), ('Penei Sewell', 'Big', 18.5, 95.0), ('Lane Johnson', 'Big', 18.6, 94.0),
-        ('Chris Jones', 'Big', 18.1, 102.0), ('Dexter Lawrence', 'Big', 17.2, 105.0), ('Quinnen Williams', 'Big', 17.8, 98.0),
-        ('Tristan Wirfs', 'Big', 18.1, 93.0), ('Average NFL Offensive Tackle', 'Big', 16.5, 82.0),
-        ('Average NFL Interior Guard', 'Big', 16.0, 85.0), ('Average NFL Defensive Tackle', 'Big', 16.2, 88.0)
-    ]
-    return pd.DataFrame(pros, columns=['Pro Player', 'Position Group', 'Target_Speed', 'Target_Power'])
-
-# -----------------------------------------------------------------------------
 # HIGH-SPEED PARSING ENGINE
 # -----------------------------------------------------------------------------
 @st.cache_data
@@ -372,12 +348,6 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     }
     rx = bucket_prescriptions.get(assigned_bucket, bucket_prescriptions['Explosive'])
 
-    pro_db = get_nfl_pro_database()
-    pos_matched_pros = pro_db[pro_db['Position Group'] == p_group].copy()
-    p_speed_val = float(p_row['Max Vel (% Max)']) if float(p_row['Max Vel (% Max)']) > 0 else 85.0
-    pos_matched_pros['Dist'] = np.abs(pos_matched_pros['Target_Speed'] - (p_speed_val/4.0))
-    closest_pro_row = pos_matched_pros.sort_values(by='Dist').iloc[0]
-
     col_bio, col_radar = st.columns([1, 2])
     with col_bio:
         st.markdown(f"""
@@ -388,8 +358,7 @@ elif page == "👤 Page 3: Athlete Diagnostics":
             <hr style="border-top: 2px solid #500000; margin:10px 0;">
             <div style="text-align:left; font-size:0.95rem; line-height:1.6; margin-bottom:15px;">
                 <b>Position Group:</b> {p_group}<br>
-                <b>Unit Assignment:</b> {p_row['Position']}<br>
-                <b>Pro Match Model:</b> {closest_pro_row['Pro Player']}
+                <b>Unit Assignment:</b> {p_row['Position']}
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -425,13 +394,13 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     
     chosen_trend_metric = st.selectbox("🎯 Select Target Metric to Investigate:", all_possible_cols, index=0)
     fig_trend = px.line(long_df, x='Week', y=chosen_trend_metric, markers=True, color_discrete_sequence=['#800000'])
-fig_trend.update_traces(
-    line=dict(width=4),
-    marker=dict(
-        size=10,
-        line=dict(width=2, color="white")
+    fig_trend.update_traces(
+        line=dict(width=4),
+        marker=dict(
+            size=10,
+            line=dict(width=2, color="white")
+        )
     )
-)
     fig_trend.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515', xaxis=dict(gridcolor='#222222', title=""), yaxis=dict(gridcolor='#222222', title=chosen_trend_metric), height=280, margin=dict(t=10, b=10, l=10, r=10))
     st.plotly_chart(fig_trend, use_container_width=True)
     
