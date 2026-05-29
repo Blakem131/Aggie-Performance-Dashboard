@@ -591,7 +591,7 @@ st.markdown("<br>", unsafe_allow_html=True)
     # -------------------------------------------------
     # MAIN DASHBOARD SECTION
     # -------------------------------------------------
-    left, middle, right = st.columns([1.05, 1.65, 1.15])
+left, middle, right = st.columns([1.05, 1.65, 1.15])
 
     with left:
         st.markdown("### Readiness Engine")
