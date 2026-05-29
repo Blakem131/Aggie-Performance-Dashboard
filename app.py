@@ -762,7 +762,7 @@ with v3:
             "Set Avg Peak Power"
         )
 
-    st.markdown("<br>", unsafe_allow_html=True)
+
 
     # -------------------------------------------------
     # DIAGNOSTIC PANEL
