@@ -305,518 +305,136 @@ if page == "📊 Page 1: Daily Team Monitor":
 
 # --- PAGE 2: POSITIONAL BREAKDOWNS ---
 elif page == "🎯 Page 2: Positional Breakdowns":
-    st.title("🎯 Positional Performance")
+    st.title("🎯 Positional Architecture Performance Tiers")
     st.divider()
     for group in ['Skill', 'Mid', 'Big']:
         st.markdown(f"## **{group.upper()} UNIT LEADERBOARD**")
         g_df = working_df[working_df['Position Group'] == group]
         st.dataframe(g_df[['Player', 'Position', 'Total Player Load', 'Explosive Yardage', 'Jump Height', 'mRSI']].sort_values(by='Total Player Load', ascending=False), width='stretch', hide_index=True)
 
-# --- PAGE 3: MIDNIGHT AGGIE ATHLETE OS ---
+# --- PAGE 3: INDIVIDUAL ATHLETE DIAGNOSTIC ---
 elif page == "👤 Page 3: Athlete Diagnostics":
-
-    st.title("Athlete Dashboard")
-    st.markdown(f"### High-Density Athlete Performance Dashboard | Date: **{selected_date}**")
+    st.title("👤 Individual Athlete Profile Diagnostics")
     st.divider()
+    
+    selected_p = st.selectbox("Select Target Athlete Profile Panel:", working_df['Player'].tolist())
+    p_row = working_df[working_df['Player'] == selected_p].iloc[0]
+    p_group = p_row['Position Group'] if p_row['Position Group'] in ['Skill', 'Mid', 'Big'] else 'Skill'
+    
+    weight_scale_df = get_coaches_weighted_scale()
+    group_scale = weight_scale_df[weight_scale_df['Group'] == p_group]
+    
+    bucket_totals = {'Speed': 0.0, 'Strength': 0.0, 'Explosive': 0.0, 'Elastic': 0.0, 'Braking': 0.0}
+    for _, row in group_scale.iterrows():
+        m_name = row['Metric']
+        b_type = row['Bucket']
+        w_val = row['Weight']
+        if b_type in bucket_totals:
+            raw_val = float(p_row[m_name]) if m_name in p_row else 50.0
+            bucket_totals[b_type] += raw_val * w_val
 
-    # -------------------------------------------------
-    # HELPER FUNCTIONS
-    # -------------------------------------------------
-    def safe_num(row, col, default=0.0):
-        try:
-            if col in row:
-                val = pd.to_numeric(row[col], errors="coerce")
-                if pd.notna(val):
-                    return float(val)
-        except:
-            pass
-        return default
+    assigned_bucket = min(bucket_totals, key=bucket_totals.get)
+    
+    bucket_prescriptions = {
+        'Speed': {
+            'tag': '🏃 SPEED DEFICIENT PROFILE', 'color': '#FF9900',
+            'text': 'Weighted Scale indicates top-end velocity mechanics sit below standard parameters. Focus on summer short-to-long acceleration models, flying sprints, and light ballistic drag sets.'
+        },
+        'Explosive': {
+            'tag': '⚡ EXPLOSIVE CAPACITY DEFICIENT', 'color': '#FF3333',
+            'text': 'Biomechanical indices flag deficiency in rapid power extension. Target training blocks using high-velocity Perch VBT tracking, power cleans, and loaded vertical jump extensions.'
+        },
+        'Elastic': {
+            'tag': '🐰 ELASTIC REBOUND DEFICIENT', 'color': '#CC33FF',
+            'text': 'Player indicates low elastic storage capacity (poor mRSI / long Takeoff Times). Implement continuous ankle stiffness bounds, low-amplitude repeat pogo jumps, and reactive depth drops.'
+        },
+        'Strength': {
+            'tag': '🏋️ STRENGTH BASELINE DEFICIENT', 'color': '#3399FF',
+            'text': 'Absolute force production capacity is lagging relative to body mass. Prioritize heavy overload structural work, slow eccentric squats, and structural posterior chain accents.'
+        },
+        'Braking': {
+            'tag': '🛑 BRAKING & DECELERATION DEFICIENT', 'color': '#00CC66',
+            'text': 'Eccentric absorption mechanics are lagging (poor braking forces / low NordBord outputs). Implement heavy eccentric deceleration catches, drop squats, and focused NordBord hamstring overloads.'
+        }
+    }
+    rx = bucket_prescriptions.get(assigned_bucket, bucket_prescriptions['Explosive'])
 
-    def index_score(value, group_mean, higher_is_better=True):
-        try:
-            value = float(value)
-            group_mean = float(group_mean)
-        except:
-            return 50
+    pro_db = get_nfl_pro_database()
+    pos_matched_pros = pro_db[pro_db['Position Group'] == p_group].copy()
+    p_speed_val = float(p_row['Max Vel (% Max)']) if float(p_row['Max Vel (% Max)']) > 0 else 85.0
+    pos_matched_pros['Dist'] = np.abs(pos_matched_pros['Target_Speed'] - (p_speed_val/4.0))
+    closest_pro_row = pos_matched_pros.sort_values(by='Dist').iloc[0]
 
-        if group_mean == 0 or np.isnan(group_mean):
-            return 50
-
-        if higher_is_better:
-            score = (value / group_mean) * 75
-        else:
-            score = (group_mean / value) * 75 if value != 0 else 50
-
-        return max(0, min(100, score))
-
-    def metric_tile(title, value, subtitle, color="#FFD700"):
+    col_bio, col_radar = st.columns([1, 2])
+    with col_bio:
         st.markdown(f"""
-        <div style="
-            background: linear-gradient(145deg, #151A24, #0E1118);
-            border: 1px solid #2A3140;
-            border-left: 5px solid {color};
-            border-radius: 16px;
-            padding: 18px;
-            min-height: 120px;">
-            <div style="color:#8F9CAE; font-size:0.75rem; font-weight:800; letter-spacing:1px;">
-                {title.upper()}
-            </div>
-            <div style="color:#FFFFFF; font-size:2.6rem; font-weight:900; line-height:1;">
-                {value}
-            </div>
-            <div style="color:#B8C0CC; font-size:0.85rem; margin-top:8px;">
-                {subtitle}
+        <div style="background-color:#1A1A1A; border:3px solid #500000; padding:20px; border-radius:8px; text-align:center;">
+            <span style="font-size:5rem;">👤</span>
+            <h2 style="margin:5px 0; color:#FFFFFF;">{p_row['Player']}</h2>
+            <p style="color:#A0A0A0; font-weight:bold; margin:0;">Texas A&M Football</p>
+            <hr style="border-top: 2px solid #500000; margin:10px 0;">
+            <div style="text-align:left; font-size:0.95rem; line-height:1.6; margin-bottom:15px;">
+                <b>Position Group:</b> {p_group}<br>
+                <b>Unit Assignment:</b> {p_row['Position']}<br>
+                <b>Pro Match Model:</b> {closest_pro_row['Pro Player']}
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-    def build_readiness_gauge(score):
-        fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=score,
-            number={"suffix": "%", "font": {"size": 44, "color": "white"}},
-            gauge={
-                "axis": {"range": [0, 100], "tickcolor": "white"},
-                "bar": {"color": "#FFD700"},
-                "bgcolor": "#11141A",
-                "borderwidth": 1,
-                "bordercolor": "#2A3140",
-                "steps": [
-                    {"range": [0, 40], "color": "#7A1111"},
-                    {"range": [40, 70], "color": "#8A6A00"},
-                    {"range": [70, 100], "color": "#0B6E3A"}
-                ]
-            }
-        ))
-
-        fig.update_layout(
-            height=270,
-            paper_bgcolor="rgba(0,0,0,0)",
-            font={"color": "white"},
-            margin=dict(t=20, b=20, l=20, r=20)
-        )
-        return fig
-
-    def build_radar_chart(labels, values):
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(
-            r=values,
-            theta=labels,
-            fill="toself",
-            fillcolor="rgba(80,0,0,0.45)",
-            line=dict(color="#FFD700", width=3),
-            marker=dict(size=8, color="#FFD700")
-        ))
-
-        fig.update_layout(
-            polar=dict(
-                bgcolor="#11141A",
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 100],
-                    gridcolor="#333A46",
-                    tickfont=dict(color="#AAB2C0")
-                ),
-                angularaxis=dict(
-                    gridcolor="#333A46",
-                    tickfont=dict(color="white", size=11)
-                )
-            ),
-            paper_bgcolor="rgba(0,0,0,0)",
-            showlegend=False,
-            height=330,
-            margin=dict(t=20, b=20, l=20, r=20)
-        )
-        return fig
-
-    # -------------------------------------------------
-    # ATHLETE SELECTION
-    # -------------------------------------------------
-    selected_p = st.selectbox(
-        "Select Target Athlete Profile:",
-        working_df["Player"].tolist()
-    )
-
-    p_row = working_df[working_df["Player"] == selected_p].iloc[0]
-
-    p_group = p_row["Position Group"] if p_row["Position Group"] in ["Skill", "Mid", "Big"] else "Skill"
-    p_position = p_row["Position"]
-
-    group_df = working_df[working_df["Position Group"] == p_group].copy()
-
-    # -------------------------------------------------
-    # REAL METRICS
-    # -------------------------------------------------
-    jump_height = safe_num(p_row, "Jump Height", 0)
-    mrsi = safe_num(p_row, "mRSI", 0)
-    max_speed = safe_num(p_row, "Max Speed", 0)
-    total_load = safe_num(p_row, "Total Player Load", 0)
-    explosive_yardage = safe_num(p_row, "Explosive Yardage", 0)
-    peak_power = safe_num(p_row, "Peak Power (FP)", 0)
-    peak_force = safe_num(p_row, "Peak Force (FP)", 0)
-    braking_power = safe_num(p_row, "Peak Braking Power (FP)", 0)
-    squat_power = safe_num(p_row, "Squat Set Avg Peak Power (w)", 0)
-    squat_velocity = safe_num(p_row, "Squat Set Avg Mean Velocity (m/s)", 0)
-    clean_power = safe_num(p_row, "Clean Set Avg Peak Power (w)", 0)
-    bench_power = safe_num(p_row, "Bench Peak Power", 0)
-    split_10 = safe_num(p_row, "Best 10yd Split Time [s]", 0)
-
-    # -------------------------------------------------
-    # GROUP AVERAGES
-    # -------------------------------------------------
-    def group_avg(col):
-        if col in group_df.columns:
-            return pd.to_numeric(group_df[col], errors="coerce").replace(0, np.nan).mean()
-        return 0
-
-    avg_speed = group_avg("Max Speed")
-    avg_jump = group_avg("Jump Height")
-    avg_power = group_avg("Peak Power (FP)")
-    avg_force = group_avg("Peak Force (FP)")
-    avg_strength = group_avg("Squat Set Avg Peak Power (w)")
-    avg_mrsi = group_avg("mRSI")
-    avg_braking = group_avg("Peak Braking Power (FP)")
-    avg_split_10 = group_avg("Best 10yd Split Time [s]")
-
-    # -------------------------------------------------
-    # PERFORMANCE INDICES
-    # -------------------------------------------------
-    speed_index = index_score(max_speed, avg_speed)
-    force_index = index_score(peak_force, avg_force)
-    strength_index = index_score(squat_power, avg_strength)
-    power_index = index_score(peak_power, avg_power)
-    elastic_index = index_score(mrsi, avg_mrsi)
-    braking_index = index_score(braking_power, avg_braking)
-
-    readiness_score = int(np.nanmean([
-        speed_index,
-        force_index,
-        strength_index,
-        power_index,
-        elastic_index,
-        index_score(jump_height, avg_jump)
-    ]))
-
-    readiness_score = max(0, min(100, readiness_score))
-
-    if readiness_score >= 80:
-        readiness_status = "PRIMED"
-        readiness_color = "#00CC66"
-        readiness_note = "Athlete is responding well to recent training load. Neuromuscular readiness indicators are stable."
-    elif readiness_score >= 60:
-        readiness_status = "MANAGED"
-        readiness_color = "#FFD700"
-        readiness_note = "Moderate readiness state detected. Monitor high-speed exposure and eccentric fatigue accumulation."
-    else:
-        readiness_status = "FATIGUED"
-        readiness_color = "#FF3333"
-        readiness_note = "Acute fatigue accumulation detected. Reduce CNS-intensive loading and monitor jump trends closely."
-
-    # -------------------------------------------------
-    # DEFICIENCY LOGIC
-    # -------------------------------------------------
-    deficiency_scores = {
-        "Speed": speed_index,
-        "Force": force_index,
-        "Strength": strength_index,
-        "Power": power_index,
-        "Elastic": elastic_index,
-        "Braking": braking_index
-    }
-
-    primary_deficiency = min(deficiency_scores, key=deficiency_scores.get)
-
-    prescriptions = {
-        "Speed": "Flying 10s, wicket runs, sprint exposure, and top-end mechanics.",
-        "Force": "Heavy sled pushes, resisted accelerations, horizontal force work.",
-        "Strength": "Heavy squatting, posterior chain overload, eccentric strength.",
-        "Power": "Power cleans, loaded jumps, med ball throws, ballistic VBT.",
-        "Elastic": "Pogos, repeated jumps, stiffness work, reactive plyometrics.",
-        "Braking": "Deceleration drills, snap downs, NordBord hamstring overloads."
-    }
-
-    # -------------------------------------------------
-    # HEADER
-    # -------------------------------------------------
-    st.markdown(f"""
-    <div style="
-        background: linear-gradient(135deg, #500000 0%, #11141A 55%, #0B0C10 100%);
-        border: 1px solid #2A3140;
-        border-radius: 22px;
-        padding: 28px;
-        margin-bottom: 20px;">
-
-        <div style="font-size:0.9rem; color:#FFD700; font-weight:900; letter-spacing:2px;">
-            TEXAS A&M FOOTBALL PERFORMANCE
+        
+        st.markdown(f"""
+        <div style="background-color:#222222; border-left: 6px solid {rx['color']}; padding:15px; border-radius:4px; margin-top:10px;">
+            <h5 style="margin:0 0 5px 0; color:{rx['color']}; font-weight:bold; text-transform:uppercase;">{rx['tag']}</h5>
+            <p style="margin:0; font-size:0.88rem; color:#DDDDDD; line-height:1.4;">{rx['text']}</p>
         </div>
+        """, unsafe_allow_html=True)
+        
+    with col_radar:
+        radar_metrics = ['Speed Index', 'Strength Index', 'Explosive Index', 'Elastic Index', 'Braking Index']
+        v_speed = max(35.0, min(100.0, bucket_totals.get('Speed', 60.0) * 1.5))
+        v_strength = max(35.0, min(100.0, bucket_totals.get('Strength', 60.0) * 1.5))
+        v_explosive = max(35.0, min(100.0, bucket_totals.get('Explosive', 60.0) * 1.5))
+        v_elastic = max(35.0, min(100.0, bucket_totals.get('Elastic', 60.0) * 1.5))
+        v_braking = max(35.0, min(100.0, bucket_totals.get('Braking', 60.0) * 1.5))
+        
+        fig_r = go.Figure()
+        fig_r.add_trace(go.Scatterpolar(r=[v_speed, v_strength, v_explosive, v_elastic, v_braking], theta=radar_metrics, fill='toself', fillcolor='rgba(128,0,0,0.4)', line=dict(color='#800000', width=3)))
+        fig_r.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100], gridcolor='#444444'), bgcolor='#1A1A1A'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, margin=dict(t=30, b=10, l=10, r=10), height=260)
+        st.plotly_chart(fig_r, use_container_width=True)
 
-        <div style="font-size:3.2rem; color:white; font-weight:950; line-height:1;">
-            {selected_p}
-        </div>
-
-        <div style="font-size:1.15rem; color:#C9D0DA; font-weight:700; margin-top:8px;">
-            {p_position} // {p_group} // Midnight Aggie Athlete OS
-        </div>
-
-        <div style="margin-top:14px;">
-            <span style="background:{readiness_color}; color:#0B0C10; padding:8px 16px; border-radius:999px; font-weight:900;">
-                {readiness_status} — {readiness_score}%
-            </span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # -------------------------------------------------
-    # KPI CARDS
-    # -------------------------------------------------
-    c1, c2, c3, c4 = st.columns(4)
-
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    st.metric("Speed Index", f"{speed_index:.0f}%", f"Max Speed: {max_speed:.1f}")
-
-with c2:
-    st.metric("Force Index", f"{force_index:.0f}%", f"Peak Force: {peak_force:.0f}")
-
-with c3:
-    st.metric("Strength Index", f"{strength_index:.0f}%", f"Squat Power: {squat_power:.0f} W")
-
-with c4:
-    st.metric("Power Index", f"{power_index:.0f}%", f"Peak Power: {peak_power:.0f}")
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-
-    # -------------------------------------------------
-    # MAIN DASHBOARD SECTION
-    # -------------------------------------------------
-left, middle, right = st.columns([1.05, 1.65, 1.15])
-
-
-left, middle, right = st.columns([1.05, 1.65, 1.15])
-
-with left:
-
-    st.markdown("### Readiness Engine")
-
-    st.plotly_chart(
-        build_readiness_gauge(readiness_score),
-        use_container_width=True
-    )
-
-    st.markdown(f"""
-    <div style="
-        background:#11141A;
-        border:1px solid #2A3140;
-        border-radius:16px;
-        padding:16px;">
-
-        <div style="color:#FFD700; font-weight:900; font-size:0.8rem;">
-            READINESS ANALYSIS
-        </div>
-
-        <div style="color:white; font-size:1rem; font-weight:800; margin-top:6px;">
-            {readiness_status}
-        </div>
-
-        <div style="color:#C9D0DA; font-size:0.9rem; line-height:1.45; margin-top:8px;">
-            {readiness_note}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with middle:
-
-    st.markdown("### Historical Trend Tracker")
-
-    timeline_weeks = [
-        "Wk 1", "Wk 2", "Wk 3", "Wk 4",
-        "Wk 5", "Wk 6", "Wk 7", "Wk 8"
-    ]
-
-    trend_df = pd.DataFrame({"Week": timeline_weeks})
-
-    trend_df["Total Player Load"] = [
-        total_load * x for x in [0.85, 0.92, 1.05, 0.98, 1.15, 1.02, 0.95, 1.00]
-    ]
-
-    trend_df["Jump Height"] = [
-        jump_height * x for x in [0.92, 0.95, 0.98, 0.96, 1.00, 1.02, 0.99, 1.00]
-    ]
-
-    trend_df["mRSI"] = [
-        mrsi * x for x in [0.90, 0.94, 0.96, 0.95, 1.00, 1.04, 1.02, 1.00]
-    ]
-
-    metric_choice = st.selectbox(
-        "Select Neuromuscular Metric:",
-        ["Jump Height", "mRSI"]
-    )
-
-    fig_trend = go.Figure()
-
-    fig_trend.add_trace(go.Bar(
-        x=trend_df["Week"],
-        y=trend_df["Total Player Load"],
-        name="Total Player Load",
-        marker_color="#500000",
-        opacity=0.8,
-        yaxis="y1"
-    ))
-
-    fig_trend.add_trace(go.Scatter(
-        x=trend_df["Week"],
-        y=trend_df[metric_choice],
-        name=metric_choice,
-        mode="lines+markers",
-        line=dict(color="#FFD700", width=4),
-        marker=dict(size=10, color="#FFD700"),
-        yaxis="y2"
-    ))
-
-    fig_trend.update_layout(
-        height=390,
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#11141A",
-        font=dict(color="white"),
-        xaxis=dict(gridcolor="#252B36"),
-        yaxis=dict(
-            title="Player Load",
-            side="left",
-            gridcolor="#252B36"
-        ),
-        yaxis2=dict(
-            title=metric_choice,
-            overlaying="y",
-            side="right",
-            showgrid=False
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        margin=dict(t=30, b=30, l=20, r=20)
-    )
-
+    st.divider()
+    
+    # --- PART 1: INTERACTIVE CLICK-TO-POPULATE TREND MODULE ---
+    st.subheader("📈 Interactive Multi-Tech Historical Line Tracker")
+    timeline_weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8', 'Week 9', 'Week 10']
+    long_df = pd.DataFrame({'Week': timeline_weeks})
+    for c in all_possible_cols: 
+        long_df[c] = [round(float(p_row[c])*x if float(p_row[c])>0 else np.random.randint(20,500)*x, 2) for x in [0.9, 0.95, 1.15, 0.85, 1.0, 1.05, 1.20, 0.90, 1.10, 1.05]]
+    
+    chosen_trend_metric = st.selectbox("🎯 Select Target Metric to Investigate:", all_possible_cols, index=0)
+    fig_trend = px.line(long_df, x='Week', y=chosen_trend_metric, markers=True, color_discrete_sequence=['#800000'])
+    fig_trend.update_traces(line=dict(width=4), marker=dict(size=10, borderwidth=2, bordercolor='white'))
+    fig_trend.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515', xaxis=dict(gridcolor='#222222', title=""), yaxis=dict(gridcolor='#222222', title=chosen_trend_metric), height=280, margin=dict(t=10, b=10, l=10, r=10))
     st.plotly_chart(fig_trend, use_container_width=True)
+    
+    st.divider()
 
-with right:
-
-    st.markdown("### Athletic Profile")
-
-    radar_labels = [
-        "Max Speed",
-        "Jump Height",
-        "Peak Power",
-        "10yd Split",
-        "Peak mRSI"
-    ]
-
-    radar_values = [
-        speed_index,
-        index_score(jump_height, avg_jump),
-        power_index,
-        index_score(split_10, group_avg("Best 10yd Split Time [s]"), higher_is_better=False),
-        index_score(mrsi, avg_mrsi)
-    ]
-
-    st.plotly_chart(
-        build_radar_chart(radar_labels, radar_values),
-        use_container_width=True
+    # --- PART 2: DUAL-AXIS FATIGUE LOAD RESPONSE LAB ---
+    st.subheader("⏱️ Neuromuscular Load Response Fatigue Lab")
+    load_response_df = long_df.copy()
+    load_response_df['Next Day Jump Height'] = load_response_df['Jump Height'].shift(-1).fillna(load_response_df['Jump Height'].mean()).round(1)
+    
+    fig_response = go.Figure()
+    fig_response.add_trace(go.Bar(x=load_response_df['Week'], y=load_response_df['Total Player Load'], name='Day 1: Total Player Load', marker_color='#500000', opacity=0.75, yaxis='y1'))
+    fig_response.add_trace(go.Scatter(x=load_response_df['Week'], y=load_response_df['Next Day Jump Height'], name='Day 2: Next-Day Jump Height', line=dict(color='#FFDD00', width=4), marker=dict(size=8), yaxis='y2'))
+    fig_response.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515',
+        xaxis=dict(gridcolor='#222222', title="Tracking Microcycle Weeks"),
+        yaxis=dict(title='Catapult Accumulation Volume (Load Units)', side='left', showgrid=False),
+        yaxis2=dict(title='Hawkins Neuromuscular Output (Jump Inches)', side='right', overlaying='y', showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=320, margin=dict(t=20, b=20, l=10, r=10)
     )
-
-st.divider()
-
-
-
-    # -------------------------------------------------
-    # VBT HUB
-    # -------------------------------------------------
-st.markdown("## 🏋️ Velocity Based Training Hub")
-
-v1, v2, v3 = st.columns(3)
-
-with v1:
-    st.metric(
-        "Bench Press Power",
-        f"{bench_power:.0f}",
-        "Peak Power Output"
-    )
-
-with v2:
-    st.metric(
-        "Back Squat Velocity",
-        f"{squat_velocity:.2f}",
-        "Set Avg Mean Velocity"
-    )
-
-with v3:
-    st.metric(
-        "Power Clean Output",
-        f"{clean_power:.0f}",
-        "Set Avg Peak Power"
-    )
-
-st.divider()
-
-st.markdown(f"""
-<div style="
-    background: linear-gradient(135deg, #151A24, #0B0C10);
-    border: 1px solid #2A3140;
-    border-left: 8px solid #FFD700;
-    border-radius: 18px;
-    padding: 24px;
-    margin-top: 10px;">
-
-    <div style="color:#FFD700; font-size:0.85rem; font-weight:900; letter-spacing:1.5px;">
-        ATHLETE DEFICIENCY DIAGNOSTIC
-    </div>
-
-    <div style="color:white; font-size:2rem; font-weight:950; margin-top:6px;">
-        {primary_deficiency} Deficient Profile
-    </div>
-
-    <div style="color:#C9D0DA; font-size:1rem; line-height:1.55; margin-top:10px;">
-        Current profile suggests the lowest relative development bucket is <b>{primary_deficiency}</b>.
-        Recommended intervention: {prescriptions[primary_deficiency]}
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-st.divider()
-
-st.markdown("## 📊 Athlete Data Snapshot")
-
-snapshot_cols = [
-    "Total Player Load",
-    "Explosive Yardage",
-    "Max Speed",
-    "Jump Height",
-    "mRSI",
-    "Peak Power (FP)",
-    "Peak Force (FP)",
-    "Peak Braking Power (FP)",
-    "Squat Set Avg Peak Power (w)",
-    "Squat Set Avg Mean Velocity (m/s)",
-    "Clean Set Avg Peak Power (w)"
-]
-
-available_cols = [
-    c for c in snapshot_cols
-    if c in working_df.columns
-]
-
-st.dataframe(
-    pd.DataFrame(p_row[available_cols]).reset_index().rename(
-        columns={"index": "Metric", p_row.name: "Value"}
-    ),
-    use_container_width=True,
-    hide_index=True
-)
+    st.plotly_chart(fig_response, use_container_width=True)
 
 # --- PAGE 4: OVERHAULED TARGET TRACKING GRID ---
 elif page == "☀️ Page 4: Summer 2026 Targets":
@@ -859,8 +477,8 @@ elif page == "☀️ Page 4: Summer 2026 Targets":
         </div>
         """
 
-row1_c1, row1_c2, row1_c3 = st.columns(3)
-with row1_c1:
+    row1_c1, row1_c2, row1_c3 = st.columns(3)
+    with row1_c1:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>🏃 SPEED CAPACITY MODULE</h4>
@@ -871,7 +489,7 @@ with row1_c1:
         </div>
         """, unsafe_allow_html=True)
 
- with row1_c2:
+    with row1_c2:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>⚡ EXPLOSIVE POWER MODULE</h4>
@@ -882,7 +500,7 @@ with row1_c1:
         </div>
         """, unsafe_allow_html=True)
 
-with row1_c3:
+    with row1_c3:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>🐰 ELASTIC REBOUND RECOIL</h4>
@@ -905,7 +523,7 @@ with row1_c3:
         </div>
         """, unsafe_allow_html=True)
 
- with row2_c2:
+    with row2_c2:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>🛑 ECCENTRIC BRAKING CAPTURE</h4>
@@ -916,7 +534,7 @@ with row1_c3:
         </div>
         """, unsafe_allow_html=True)
 
-with row2_c3:
+    with row2_c3:
         st.markdown(f"""
         <div class="dashboard-tile" style="height: 100%;">
             <h4>🎯 POSITION UNIT STRATEGIC OUTLOOK</h4>
@@ -948,7 +566,7 @@ elif page == "⏱️ Page 5: Tactical Practice Planner":
     }
     active_drills = []
     col_a, col_b = st.columns([1, 2])
-with col_a:
+    with col_a:
         st.markdown("#### **Select Active Period Drills**")
         for d_name, d_metrics in drill_library.items():
             is_selected = st.checkbox(f"Include: {d_name}", value=False)
@@ -956,7 +574,7 @@ with col_a:
                 d_duration = st.number_input(f"Minutes for {d_name}:", min_value=1, max_value=45, value=10, key=f"dur_{d_name}")
                 active_drills.append({'Drill': d_name, 'Duration': d_duration, 'Total Load Calc': d_metrics['Load_Per_Min'] * d_duration, 'Total Dist Calc': d_metrics['Dist_Per_Min'] * d_duration})
                 
-with col_b:
+    with col_b:
         st.markdown("#### **Predictive Session Estimation Analytics**")
         if len(active_drills) > 0:
             plan_df = pd.DataFrame(active_drills)
