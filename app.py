@@ -741,92 +741,85 @@ st.markdown("## 🏋️ Velocity Based Training Hub")
 v1, v2, v3 = st.columns(3)
 
 with v1:
-        metric_tile(
-            "Bench Press Power",
-            f"{bench_power:.0f}",
-            "Peak Power Output"
-        )
-
-with v2:
-        metric_tile(
-            "Back Squat Velocity",
-            f"{squat_velocity:.2f}",
-            "Set Avg Mean Velocity",
-            "#FFFFFF"
-        )
-
-with v3:
-        metric_tile(
-            "Power Clean Output",
-            f"{clean_power:.0f}",
-            "Set Avg Peak Power"
-        )
-
-
-
-    # -------------------------------------------------
-    # DIAGNOSTIC PANEL
-    # -------------------------------------------------
-    st.markdown(f"""
-    <div style="
-        background: linear-gradient(135deg, #151A24, #0B0C10);
-        border: 1px solid #2A3140;
-        border-left: 8px solid #FFD700;
-        border-radius: 18px;
-        padding: 24px;
-        margin-top: 10px;">
-
-        <div style="color:#FFD700; font-size:0.85rem; font-weight:900; letter-spacing:1.5px;">
-            ATHLETE DEFICIENCY DIAGNOSTIC
-        </div>
-
-        <div style="color:white; font-size:2rem; font-weight:950; margin-top:6px;">
-            {primary_deficiency} Deficient Profile
-        </div>
-
-        <div style="color:#C9D0DA; font-size:1rem; line-height:1.55; margin-top:10px;">
-            Current profile suggests the lowest relative development bucket is <b>{primary_deficiency}</b>.
-            Recommended intervention: {prescriptions[primary_deficiency]}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-
-    # -------------------------------------------------
-    # DATA SNAPSHOT
-    # -------------------------------------------------
-    st.markdown("## 📊 Athlete Data Snapshot")
-
-    snapshot_cols = [
-        "Total Player Load",
-        "Explosive Yardage",
-        "Max Speed",
-        "Jump Height",
-        "mRSI",
-        "Peak Power (FP)",
-        "Peak Force (FP)",
-        "Peak Braking Power (FP)",
-        "Squat Set Avg Peak Power (w)",
-        "Squat Set Avg Mean Velocity (m/s)",
-        "Clean Set Avg Peak Power (w)"
-    ]
-
-    available_cols = [
-        c for c in snapshot_cols
-        if c in working_df.columns
-    ]
-
-    st.dataframe(
-        pd.DataFrame(p_row[available_cols]).reset_index().rename(
-            columns={"index": "Metric", p_row.name: "Value"}
-        ),
-        use_container_width=True,
-        hide_index=True
+    st.metric(
+        "Bench Press Power",
+        f"{bench_power:.0f}",
+        "Peak Power Output"
     )
 
+with v2:
+    st.metric(
+        "Back Squat Velocity",
+        f"{squat_velocity:.2f}",
+        "Set Avg Mean Velocity"
+    )
+
+with v3:
+    st.metric(
+        "Power Clean Output",
+        f"{clean_power:.0f}",
+        "Set Avg Peak Power"
+    )
+
+st.divider()
+
+st.markdown(f"""
+<div style="
+    background: linear-gradient(135deg, #151A24, #0B0C10);
+    border: 1px solid #2A3140;
+    border-left: 8px solid #FFD700;
+    border-radius: 18px;
+    padding: 24px;
+    margin-top: 10px;">
+
+    <div style="color:#FFD700; font-size:0.85rem; font-weight:900; letter-spacing:1.5px;">
+        ATHLETE DEFICIENCY DIAGNOSTIC
+    </div>
+
+    <div style="color:white; font-size:2rem; font-weight:950; margin-top:6px;">
+        {primary_deficiency} Deficient Profile
+    </div>
+
+    <div style="color:#C9D0DA; font-size:1rem; line-height:1.55; margin-top:10px;">
+        Current profile suggests the lowest relative development bucket is <b>{primary_deficiency}</b>.
+        Recommended intervention: {prescriptions[primary_deficiency]}
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+st.divider()
+
+st.markdown("## 📊 Athlete Data Snapshot")
+
+snapshot_cols = [
+    "Total Player Load",
+    "Explosive Yardage",
+    "Max Speed",
+    "Jump Height",
+    "mRSI",
+    "Peak Power (FP)",
+    "Peak Force (FP)",
+    "Peak Braking Power (FP)",
+    "Squat Set Avg Peak Power (w)",
+    "Squat Set Avg Mean Velocity (m/s)",
+    "Clean Set Avg Peak Power (w)"
+]
+
+available_cols = [
+    c for c in snapshot_cols
+    if c in working_df.columns
+]
+
+st.dataframe(
+    pd.DataFrame(p_row[available_cols]).reset_index().rename(
+        columns={"index": "Metric", p_row.name: "Value"}
+    ),
+    use_container_width=True,
+    hide_index=True
+)
+
 # --- PAGE 4: OVERHAULED TARGET TRACKING GRID ---
-elif page == "☀️ Page 4: Summer 2026 Targets":
+elif page == "☀️ Page 4: Summer 2026 Targets":then
     st.title("☀️ Summer 2026 Macrocycle Target Board")
     st.markdown("### Tactical Benchmark Alignment Matrix")
     st.divider()
