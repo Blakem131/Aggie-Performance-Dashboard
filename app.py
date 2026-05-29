@@ -317,7 +317,7 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     st.title("👤 Individual Athlete Profile Diagnostics")
     st.divider()
     
- ```python
+
     st.markdown(
         "<div style='font-size:1.4rem; font-weight:900; color:#FFD700; margin-bottom:8px;'>TARGET ATHLETE PROFILE</div>",
         unsafe_allow_html=True
@@ -328,7 +328,7 @@ elif page == "👤 Page 3: Athlete Diagnostics":
         working_df['Player'].tolist(),
         label_visibility="collapsed"
     )    
-```
+
 
 )
     p_row = working_df[working_df['Player'] == selected_p].iloc[0]
