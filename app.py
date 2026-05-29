@@ -317,14 +317,19 @@ elif page == "👤 Page 3: Athlete Diagnostics":
     st.title("👤 Individual Athlete Profile Diagnostics")
     st.divider()
     
-  st.markdown(
-    "<div style='font-size:1.4rem; font-weight:900; color:#FFD700; margin-bottom:8px;'>TARGET ATHLETE PROFILE</div>",
-    unsafe_allow_html=True
-)
-selected_p = st.selectbox(
-    "Target Athlete Profile",
-    working_df['Player'].tolist(),
-    label_visibility="collapsed"
+ ```python
+    st.markdown(
+        "<div style='font-size:1.4rem; font-weight:900; color:#FFD700; margin-bottom:8px;'>TARGET ATHLETE PROFILE</div>",
+        unsafe_allow_html=True
+    )
+
+    selected_p = st.selectbox(
+        "Target Athlete Profile",
+        working_df['Player'].tolist(),
+        label_visibility="collapsed"
+    )    
+```
+
 )
     p_row = working_df[working_df['Player'] == selected_p].iloc[0]
     p_group = p_row['Position Group'] if p_row['Position Group'] in ['Skill', 'Mid', 'Big'] else 'Skill'
