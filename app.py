@@ -819,7 +819,7 @@ st.dataframe(
 )
 
 # --- PAGE 4: OVERHAULED TARGET TRACKING GRID ---
-elif page == "☀️ Page 4: Summer 2026 Targets":then
+elif page == "☀️ Page 4: Summer 2026 Targets":
     st.title("☀️ Summer 2026 Macrocycle Target Board")
     st.markdown("### Tactical Benchmark Alignment Matrix")
     st.divider()
