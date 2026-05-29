@@ -148,8 +148,7 @@ def generate_stabilized_performance_cache(roster_keys, all_possible_cols):
 def load_entire_database_cache(file_path, catapult_metrics, hawkins_metrics, perch_metrics):
     data_bundles = {
         'df_catapult': pd.DataFrame(), 'df_hawkins': pd.DataFrame(), 
-        'df_perch_squat': pd.DataFrame(), 'df_perch_clean': pd.DataFrame(),
-        'df_rankings': pd.DataFrame(), 'unique_dates': []
+        'df_perch_squat': pd.DataFrame(), 'df_perch_clean': pd.DataFrame(), 'unique_dates': []
     }
     if not os.path.exists(file_path):
         return data_bundles
@@ -199,17 +198,6 @@ def load_entire_database_cache(file_path, catapult_metrics, hawkins_metrics, per
                 data_bundles['df_perch_clean'] = df_clean[['Match_Key', 'Date'] + [c for c in perch_metrics if c in df_clean.columns]]
                 if 'Date' in df_perch_raw.columns: all_dates.extend(df_perch_raw['Date'].dropna().unique().tolist())
 
-        if 'Player Rank Data Dump' in xl_file.sheet_names:
-            df_rank = pd.read_excel(xl_file, sheet_name='Player Rank Data Dump')
-            df_rank.columns = [str(c).strip() for c in df_rank.columns]
-            if 'Athlete' in df_rank.columns:
-                df_rank['Match_Key'] = df_rank['Athlete'].astype(str).str.strip().str.upper()
-                for c in ['Composite', 'Rank', 'Position Rank']:
-                    if c in df_rank.columns:
-                        df_rank[c] = pd.to_numeric(df_rank[c], errors='coerce')
-                keep_cols = ['Match_Key'] + [c for c in ['Athlete', 'Position', 'Group', 'Composite', 'Rank', 'Biggest Strength', 'Limiting Factor', 'Position Rank'] if c in df_rank.columns]
-                data_bundles['df_rankings'] = df_rank[keep_cols].drop_duplicates(subset=['Match_Key'])
-
         unique_dates = list(set([str(d).strip() for d in all_dates if str(d).strip() != "Manual Entry"]))
         data_bundles['unique_dates'] = sorted(unique_dates, reverse=True)
         return data_bundles
@@ -237,7 +225,6 @@ df_catapult = cache_bundle['df_catapult']
 df_hawkins = cache_bundle['df_hawkins']
 df_squat = cache_bundle['df_perch_squat']
 df_clean = cache_bundle['df_perch_clean']
-df_rankings = cache_bundle.get('df_rankings', pd.DataFrame())
 unique_dates = cache_bundle['unique_dates']
 
 selected_date = "Manual Entry"
@@ -276,16 +263,6 @@ for col in all_possible_cols:
     else:
         working_df[col] = simulated_backing_df[col]
 
-# Merge athlete ranking sheet if present.
-if not df_rankings.empty:
-    rank_cols = [c for c in ['Composite', 'Rank', 'Biggest Strength', 'Limiting Factor', 'Position Rank'] if c in df_rankings.columns]
-    working_df = working_df.merge(
-        df_rankings[['Match_Key'] + rank_cols],
-        on='Match_Key',
-        how='left'
-    )
-
-
 # Dynamic side nav buttons mapping with customized icons
 page = st.sidebar.radio("SELECT PORTAL DASHBOARD MODULE:", [
     "📊 Page 1: Daily Team Monitor",
@@ -311,90 +288,11 @@ elif page == "🎯 Page 2: Positional Breakdowns":
         g_df = working_df[working_df['Position Group'] == group]
         st.dataframe(g_df[['Player', 'Position', 'Total Player Load', 'Explosive Yardage', 'Jump Height', 'mRSI']].sort_values(by='Total Player Load', ascending=False), width='stretch', hide_index=True)
 
-# --- PAGE 3: ATHLETE DASHBOARD ---
+# --- PAGE 3: INDIVIDUAL ATHLETE DIAGNOSTIC ---
 elif page == "👤 Page 3: Athlete Diagnostics":
-    st.title("Athlete Dashboard")
+    st.title("👤 Individual Athlete Profile Diagnostics")
     st.divider()
-
-    def safe_float(row, col, default=0.0):
-        try:
-            if col in row and pd.notna(row[col]):
-                return float(pd.to_numeric(row[col], errors="coerce"))
-        except Exception:
-            return default
-        return default
-
-    def score_from_group(value, series, higher_is_better=True):
-        vals = pd.to_numeric(series, errors="coerce").replace(0, np.nan).dropna()
-        if len(vals) < 2 or pd.isna(value):
-            return 50.0
-        value = float(value)
-        if higher_is_better:
-            score = (vals <= value).mean() * 100
-        else:
-            score = (vals >= value).mean() * 100
-        return float(np.clip(score, 0, 100))
-
-    def avg_score(scores):
-        scores = [s for s in scores if pd.notna(s)]
-        return float(np.clip(np.mean(scores), 0, 100)) if len(scores) else 50.0
-
-    def index_card(title, value, subtext, border="#FFD700"):
-        st.markdown(f"""
-        <div style="
-            background: linear-gradient(135deg, #141923 0%, #0E1118 100%);
-            border: 1px solid #263044;
-            border-left: 6px solid {border};
-            border-radius: 16px;
-            padding: 18px 18px 16px 18px;
-            min-height: 122px;">
-            <div style="color:#8F9CAE; font-size:0.78rem; font-weight:900; letter-spacing:1.2px;">
-                {title.upper()}
-            </div>
-            <div style="color:#FFFFFF; font-size:2.65rem; font-weight:950; line-height:1.05; margin-top:6px;">
-                {value}
-            </div>
-            <div style="color:#C7CEDA; font-size:0.82rem; margin-top:6px;">
-                {subtext}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    def build_history_table(match_key):
-        frames = []
-
-        def clean_source(df, prefix=""):
-            if df.empty or "Match_Key" not in df.columns or "Date" not in df.columns:
-                return pd.DataFrame()
-            temp = df[df["Match_Key"] == match_key].copy()
-            if temp.empty:
-                return pd.DataFrame()
-            if prefix:
-                rename_cols = {c: f"{prefix}{c}" for c in temp.columns if c not in ["Match_Key", "Date"]}
-                temp = temp.rename(columns=rename_cols)
-            return temp
-
-        for source_df, prefix in [
-            (df_catapult, ""),
-            (df_hawkins, ""),
-            (df_squat, "Squat "),
-            (df_clean, "Clean "),
-        ]:
-            temp = clean_source(source_df, prefix)
-            if not temp.empty:
-                frames.append(temp)
-
-        if not frames:
-            return pd.DataFrame()
-
-        hist = frames[0]
-        for f in frames[1:]:
-            hist = hist.merge(f, on=["Match_Key", "Date"], how="outer")
-
-        hist["Date_Display"] = hist["Date"].astype(str)
-        hist["_SortDate"] = pd.to_datetime(hist["Date"], errors="coerce")
-        hist = hist.sort_values(by=["_SortDate", "Date_Display"], na_position="last")
-        return hist
+    
 
     st.markdown(
         "<div style='font-size:1.4rem; font-weight:900; color:#FFD700; margin-bottom:8px;'>TARGET ATHLETE PROFILE</div>",
@@ -403,283 +301,129 @@ elif page == "👤 Page 3: Athlete Diagnostics":
 
     selected_p = st.selectbox(
         "Target Athlete Profile",
-        working_df["Player"].tolist(),
+        working_df['Player'].tolist(),
         label_visibility="collapsed"
-    )
+    )    
 
-    p_row = working_df[working_df["Player"] == selected_p].iloc[0]
-    match_key = p_row["Match_Key"]
-    p_group = p_row["Position Group"] if p_row["Position Group"] in ["Skill", "Mid", "Big"] else "Skill"
-    p_position = p_row["Position"]
 
-    group_df = working_df[working_df["Position Group"] == p_group].copy()
 
-    # Core current values
-    max_speed = safe_float(p_row, "Max Speed")
-    max_vel_pct = safe_float(p_row, "Max Vel (% Max)")
-    max_accel = safe_float(p_row, "Max Acceleration")
-    split_10 = safe_float(p_row, "Best 10yd Split Time [s]")
+    p_row = working_df[working_df['Player'] == selected_p].iloc[0]
+    p_group = p_row['Position Group'] if p_row['Position Group'] in ['Skill', 'Mid', 'Big'] else 'Skill'
+    
+    weight_scale_df = get_coaches_weighted_scale()
+    group_scale = weight_scale_df[weight_scale_df['Group'] == p_group]
+    
+    bucket_totals = {'Speed': 0.0, 'Strength': 0.0, 'Explosive': 0.0, 'Elastic': 0.0, 'Braking': 0.0}
+    for _, row in group_scale.iterrows():
+        m_name = row['Metric']
+        b_type = row['Bucket']
+        w_val = row['Weight']
+        if b_type in bucket_totals:
+            raw_val = float(p_row[m_name]) if m_name in p_row else 50.0
+            bucket_totals[b_type] += raw_val * w_val
 
-    peak_power = safe_float(p_row, "Peak Power (FP)")
-    clean_power = safe_float(p_row, "Clean Set Avg Peak Power (w)")
-    bench_power = safe_float(p_row, "Bench Peak Power")
-    jump_height = safe_float(p_row, "Jump Height")
-    mrsi = safe_float(p_row, "mRSI")
+    assigned_bucket = min(bucket_totals, key=bucket_totals.get)
+    
+    bucket_prescriptions = {
+        'Speed': {
+            'tag': '🏃 SPEED DEFICIENT PROFILE', 'color': '#FF9900',
+            'text': 'Weighted Scale indicates top-end velocity mechanics sit below standard parameters. Focus on summer short-to-long acceleration models, flying sprints, and light ballistic drag sets.'
+        },
+        'Explosive': {
+            'tag': '⚡ EXPLOSIVE CAPACITY DEFICIENT', 'color': '#FF3333',
+            'text': 'Biomechanical indices flag deficiency in rapid power extension. Target training blocks using high-velocity Perch VBT tracking, power cleans, and loaded vertical jump extensions.'
+        },
+        'Elastic': {
+            'tag': '🐰 ELASTIC REBOUND DEFICIENT', 'color': '#CC33FF',
+            'text': 'Player indicates low elastic storage capacity (poor mRSI / long Takeoff Times). Implement continuous ankle stiffness bounds, low-amplitude repeat pogo jumps, and reactive depth drops.'
+        },
+        'Strength': {
+            'tag': '🏋️ STRENGTH BASELINE DEFICIENT', 'color': '#3399FF',
+            'text': 'Absolute force production capacity is lagging relative to body mass. Prioritize heavy overload structural work, slow eccentric squats, and structural posterior chain accents.'
+        },
+        'Braking': {
+            'tag': '🛑 BRAKING & DECELERATION DEFICIENT', 'color': '#00CC66',
+            'text': 'Eccentric absorption mechanics are lagging (poor braking forces / low NordBord outputs). Implement heavy eccentric deceleration catches, drop squats, and focused NordBord hamstring overloads.'
+        }
+    }
+    rx = bucket_prescriptions.get(assigned_bucket, bucket_prescriptions['Explosive'])
 
-    squat_power = safe_float(p_row, "Squat Set Avg Peak Power (w)")
-    squat_velocity = safe_float(p_row, "Squat Set Avg Mean Velocity (m/s)")
-    f0 = safe_float(p_row, "F0")
-
-    peak_force = safe_float(p_row, "Peak Force (FP)")
-    braking_force = safe_float(p_row, "Peak Braking Force (FP)")
-    braking_power = safe_float(p_row, "Peak Braking Power (FP)")
-    nordbord = safe_float(p_row, "Peak Force Nord Bord")
-
-    # Index scores as position-group percentiles
-    speed_score = avg_score([
-        score_from_group(max_speed, group_df["Max Speed"], True) if "Max Speed" in group_df.columns else np.nan,
-        score_from_group(max_vel_pct, group_df["Max Vel (% Max)"], True) if "Max Vel (% Max)" in group_df.columns else np.nan,
-        score_from_group(max_accel, group_df["Max Acceleration"], True) if "Max Acceleration" in group_df.columns else np.nan,
-        score_from_group(split_10, group_df["Best 10yd Split Time [s]"], False) if "Best 10yd Split Time [s]" in group_df.columns else np.nan,
-    ])
-
-    power_score = avg_score([
-        score_from_group(peak_power, group_df["Peak Power (FP)"], True) if "Peak Power (FP)" in group_df.columns else np.nan,
-        score_from_group(clean_power, group_df["Clean Set Avg Peak Power (w)"], True) if "Clean Set Avg Peak Power (w)" in group_df.columns else np.nan,
-        score_from_group(bench_power, group_df["Bench Peak Power"], True) if "Bench Peak Power" in group_df.columns else np.nan,
-        score_from_group(jump_height, group_df["Jump Height"], True) if "Jump Height" in group_df.columns else np.nan,
-    ])
-
-    strength_score = avg_score([
-        score_from_group(squat_power, group_df["Squat Set Avg Peak Power (w)"], True) if "Squat Set Avg Peak Power (w)" in group_df.columns else np.nan,
-        score_from_group(f0, group_df["F0"], True) if "F0" in group_df.columns else np.nan,
-        score_from_group(squat_velocity, group_df["Squat Set Avg Mean Velocity (m/s)"], True) if "Squat Set Avg Mean Velocity (m/s)" in group_df.columns else np.nan,
-    ])
-
-    force_score = avg_score([
-        score_from_group(peak_force, group_df["Peak Force (FP)"], True) if "Peak Force (FP)" in group_df.columns else np.nan,
-        score_from_group(braking_force, group_df["Peak Braking Force (FP)"], True) if "Peak Braking Force (FP)" in group_df.columns else np.nan,
-        score_from_group(nordbord, group_df["Peak Force Nord Bord"], True) if "Peak Force Nord Bord" in group_df.columns else np.nan,
-    ])
-
-    # Ranking data from Player Rank Data Dump
-    team_rank = p_row["Rank"] if "Rank" in p_row and pd.notna(p_row["Rank"]) else "—"
-    position_rank = p_row["Position Rank"] if "Position Rank" in p_row and pd.notna(p_row["Position Rank"]) else "—"
-    composite = p_row["Composite"] if "Composite" in p_row and pd.notna(p_row["Composite"]) else np.nan
-    biggest_strength = p_row["Biggest Strength"] if "Biggest Strength" in p_row and pd.notna(p_row["Biggest Strength"]) else "Not listed"
-    limiting_factor = p_row["Limiting Factor"] if "Limiting Factor" in p_row and pd.notna(p_row["Limiting Factor"]) else "Not listed"
-
-    composite_label = f"{float(composite):.1f}%" if pd.notna(composite) and float(composite) <= 100 else (f"{float(composite):.1f}" if pd.notna(composite) else "—")
-
-    st.markdown(f"""
-    <div style="
-        background: linear-gradient(135deg, #500000 0%, #171A22 55%, #0B0C10 100%);
-        border: 1px solid #2A3140;
-        border-radius: 20px;
-        padding: 24px;
-        margin: 12px 0 18px 0;">
-        <div style="color:#FFD700; font-weight:900; font-size:0.8rem; letter-spacing:2px;">
-            TEXAS A&M FOOTBALL PERFORMANCE
-        </div>
-        <div style="color:white; font-size:2.8rem; font-weight:950; line-height:1.05;">
-            {selected_p}
-        </div>
-        <div style="color:#C8D0DC; font-size:1rem; font-weight:800; margin-top:8px;">
-            {p_position} // {p_group} // Athlete Dashboard
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    k1, k2, k3, k4, k5, k6 = st.columns(6)
-    with k1:
-        index_card("Speed Score", f"{speed_score:.0f}%", f"Max Speed: {max_speed:.1f}", "#FFD700")
-    with k2:
-        index_card("Power Score", f"{power_score:.0f}%", f"Peak Power: {peak_power:.0f}", "#FFFFFF")
-    with k3:
-        index_card("Strength Score", f"{strength_score:.0f}%", f"Squat Power: {squat_power:.0f}", "#FFD700")
-    with k4:
-        index_card("Force Score", f"{force_score:.0f}%", f"Peak Force: {peak_force:.0f}", "#FFFFFF")
-    with k5:
-        index_card("Position Rank", f"#{position_rank}", f"{p_position} group", "#FFD700")
-    with k6:
-        index_card("Team Rank", f"#{team_rank}", f"Composite: {composite_label}", "#FFFFFF")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    col_bio, col_radar = st.columns([1, 1.35])
-
+    col_bio, col_radar = st.columns([1, 2])
     with col_bio:
         st.markdown(f"""
-        <div style="background-color:#1A1A1A; border:2px solid #500000; padding:20px; border-radius:14px;">
-            <div style="font-size:0.8rem; color:#FFD700; font-weight:900; letter-spacing:1.5px;">
-                ATHLETE SNAPSHOT
-            </div>
-            <h2 style="margin:8px 0 4px 0; color:#FFFFFF;">{selected_p}</h2>
-            <div style="color:#AAB2C0; font-weight:bold; margin-bottom:14px;">Texas A&M Football</div>
-            <div style="line-height:1.8; font-size:0.98rem;">
-                <b>Position:</b> {p_position}<br>
-                <b>Group:</b> {p_group}<br>
-                <b>Biggest Strength:</b> {biggest_strength}<br>
-                <b>Limiting Factor:</b> {limiting_factor}
+        <div style="background-color:#1A1A1A; border:3px solid #500000; padding:20px; border-radius:8px; text-align:center;">
+            <span style="font-size:5rem;">👤</span>
+            <h2 style="margin:5px 0; color:#FFFFFF;">{p_row['Player']}</h2>
+            <p style="color:#A0A0A0; font-weight:bold; margin:0;">Texas A&M Football</p>
+            <hr style="border-top: 2px solid #500000; margin:10px 0;">
+            <div style="text-align:left; font-size:0.95rem; line-height:1.6; margin-bottom:15px;">
+                <b>Position Group:</b> {p_group}<br>
+                <b>Unit Assignment:</b> {p_row['Position']}
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-        focus_map = {
-            "Speed": "Flying 10s, wicket runs, sprint exposure, and top-end mechanics.",
-            "Power": "Power cleans, loaded jumps, med ball throws, and high-velocity VBT work.",
-            "Strength": "Heavy squatting, posterior chain overload, and eccentric strength development.",
-            "Force": "Heavy sleds, resisted accelerations, F0 development, and force-plate force output.",
-        }
-        lowest_bucket = min(
-            {"Speed": speed_score, "Power": power_score, "Strength": strength_score, "Force": force_score},
-            key={"Speed": speed_score, "Power": power_score, "Strength": strength_score, "Force": force_score}.get
-        )
+        
         st.markdown(f"""
-        <div style="background-color:#222222; border-left: 6px solid #FFD700; padding:16px; border-radius:8px; margin-top:12px;">
-            <h5 style="margin:0 0 8px 0; color:#FFD700; font-weight:900; text-transform:uppercase;">
-                Training Diagnostic: {lowest_bucket} Emphasis
-            </h5>
-            <p style="margin:0; font-size:0.92rem; color:#DDDDDD; line-height:1.45;">
-                Current dashboard scoring flags <b>{lowest_bucket}</b> as the lowest relative index.
-                Recommended focus: {focus_map[lowest_bucket]}
-            </p>
+        <div style="background-color:#222222; border-left: 6px solid {rx['color']}; padding:15px; border-radius:4px; margin-top:10px;">
+            <h5 style="margin:0 0 5px 0; color:{rx['color']}; font-weight:bold; text-transform:uppercase;">{rx['tag']}</h5>
+            <p style="margin:0; font-size:0.88rem; color:#DDDDDD; line-height:1.4;">{rx['text']}</p>
         </div>
         """, unsafe_allow_html=True)
-
+        
     with col_radar:
-        st.markdown("### Athletic Index Radar")
-        radar_metrics = ["Speed", "Power", "Strength", "Force"]
-        radar_values = [speed_score, power_score, strength_score, force_score]
-
+        radar_metrics = ['Speed Index', 'Strength Index', 'Explosive Index', 'Elastic Index', 'Braking Index']
+        v_speed = max(35.0, min(100.0, bucket_totals.get('Speed', 60.0) * 1.5))
+        v_strength = max(35.0, min(100.0, bucket_totals.get('Strength', 60.0) * 1.5))
+        v_explosive = max(35.0, min(100.0, bucket_totals.get('Explosive', 60.0) * 1.5))
+        v_elastic = max(35.0, min(100.0, bucket_totals.get('Elastic', 60.0) * 1.5))
+        v_braking = max(35.0, min(100.0, bucket_totals.get('Braking', 60.0) * 1.5))
+        
         fig_r = go.Figure()
-        fig_r.add_trace(go.Scatterpolar(
-            r=radar_values + [radar_values[0]],
-            theta=radar_metrics + [radar_metrics[0]],
-            fill="toself",
-            fillcolor="rgba(80,0,0,0.45)",
-            line=dict(color="#FFD700", width=3),
-            marker=dict(size=9, color="#FFD700")
-        ))
-        fig_r.update_layout(
-            polar=dict(
-                bgcolor="#11141A",
-                radialaxis=dict(visible=True, range=[0,100], gridcolor="#343B49", tickfont=dict(color="#AAB2C0")),
-                angularaxis=dict(gridcolor="#343B49", tickfont=dict(color="#FFFFFF", size=12))
-            ),
-            paper_bgcolor="rgba(0,0,0,0)",
-            showlegend=False,
-            height=360,
-            margin=dict(t=35, b=25, l=25, r=25)
-        )
+        fig_r.add_trace(go.Scatterpolar(r=[v_speed, v_strength, v_explosive, v_elastic, v_braking], theta=radar_metrics, fill='toself', fillcolor='rgba(128,0,0,0.4)', line=dict(color='#800000', width=3)))
+        fig_r.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100], gridcolor='#444444'), bgcolor='#1A1A1A'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, margin=dict(t=30, b=10, l=10, r=10), height=260)
         st.plotly_chart(fig_r, use_container_width=True)
 
     st.divider()
-
-    # --- REAL DATABASE HISTORICAL TREND MODULE ---
-    st.subheader("📈 Real Database Historical Trend Tracker")
-
-    hist_df = build_history_table(match_key)
-
-    if hist_df.empty:
-        st.warning("No historical rows found yet for this athlete in Catapult, Hawkins, or Perch sheets.")
-    else:
-        available_trend_metrics = [
-            c for c in all_possible_cols
-            if c in hist_df.columns and pd.to_numeric(hist_df[c], errors="coerce").notna().sum() > 0
-        ]
-
-        if len(available_trend_metrics) == 0:
-            st.warning("Historical rows were found, but no numeric trend metrics are available yet.")
-        else:
-            default_options = [m for m in ["Jump Height", "mRSI", "Total Player Load", "Max Speed", "Peak Power (FP)"] if m in available_trend_metrics]
-            metric_default = available_trend_metrics.index(default_options[0]) if default_options else 0
-
-            chosen_trend_metric = st.selectbox(
-                "Select Metric to Trend:",
-                available_trend_metrics,
-                index=metric_default
-            )
-
-            plot_df = hist_df[["Date_Display", chosen_trend_metric]].copy()
-            plot_df[chosen_trend_metric] = pd.to_numeric(plot_df[chosen_trend_metric], errors="coerce")
-            plot_df = plot_df.dropna(subset=[chosen_trend_metric])
-
-            fig_trend = go.Figure()
-            fig_trend.add_trace(go.Scatter(
-                x=plot_df["Date_Display"],
-                y=plot_df[chosen_trend_metric],
-                mode="lines+markers",
-                line=dict(color="#FFD700", width=4, shape="spline"),
-                marker=dict(size=11, color="#FFD700", line=dict(width=2, color="#FFFFFF")),
-                fill="tozeroy",
-                fillcolor="rgba(80,0,0,0.22)",
-                name=chosen_trend_metric
-            ))
-
-            fig_trend.update_layout(
-                height=340,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="#11141A",
-                font=dict(color="#FFFFFF"),
-                xaxis=dict(title="Date", gridcolor="#252B36"),
-                yaxis=dict(title=chosen_trend_metric, gridcolor="#252B36"),
-                margin=dict(t=35, b=35, l=20, r=20),
-                hovermode="x unified"
-            )
-            st.plotly_chart(fig_trend, use_container_width=True)
-
+    
+    # --- PART 1: INTERACTIVE CLICK-TO-POPULATE TREND MODULE ---
+    st.subheader("📈 Interactive Multi-Tech Historical Line Tracker")
+    timeline_weeks = ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8', 'Week 9', 'Week 10']
+    long_df = pd.DataFrame({'Week': timeline_weeks})
+    for c in all_possible_cols: 
+        long_df[c] = [round(float(p_row[c])*x if float(p_row[c])>0 else np.random.randint(20,500)*x, 2) for x in [0.9, 0.95, 1.15, 0.85, 1.0, 1.05, 1.20, 0.90, 1.10, 1.05]]
+    
+    chosen_trend_metric = st.selectbox("🎯 Select Target Metric to Investigate:", all_possible_cols, index=0)
+    fig_trend = px.line(long_df, x='Week', y=chosen_trend_metric, markers=True, color_discrete_sequence=['#800000'])
+    fig_trend.update_traces(
+        line=dict(width=4),
+        marker=dict(
+            size=10,
+            line=dict(width=2, color="white")
+        )
+    )
+    fig_trend.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515', xaxis=dict(gridcolor='#222222', title=""), yaxis=dict(gridcolor='#222222', title=chosen_trend_metric), height=280, margin=dict(t=10, b=10, l=10, r=10))
+    st.plotly_chart(fig_trend, use_container_width=True)
+    
     st.divider()
 
-    # --- REAL LOAD RESPONSE VIEW ---
-    st.subheader("⏱️ GPS Load vs Neuromuscular Output")
+    # --- PART 2: DUAL-AXIS FATIGUE LOAD RESPONSE LAB ---
+    st.subheader("⏱️ Neuromuscular Load Response Fatigue Lab")
+    load_response_df = long_df.copy()
+    load_response_df['Next Day Jump Height'] = load_response_df['Jump Height'].shift(-1).fillna(load_response_df['Jump Height'].mean()).round(1)
+    
+    fig_response = go.Figure()
+    fig_response.add_trace(go.Bar(x=load_response_df['Week'], y=load_response_df['Total Player Load'], name='Day 1: Total Player Load', marker_color='#500000', opacity=0.75, yaxis='y1'))
+    fig_response.add_trace(go.Scatter(x=load_response_df['Week'], y=load_response_df['Next Day Jump Height'], name='Day 2: Next-Day Jump Height', line=dict(color='#FFDD00', width=4), marker=dict(size=8), yaxis='y2'))
+    fig_response.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#151515',
+        xaxis=dict(gridcolor='#222222', title="Tracking Microcycle Weeks"),
+        yaxis=dict(title='Catapult Accumulation Volume (Load Units)', side='left', showgrid=False),
+        yaxis2=dict(title='Hawkins Neuromuscular Output (Jump Inches)', side='right', overlaying='y', showgrid=False),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=320, margin=dict(t=20, b=20, l=10, r=10)
+    )
+    st.plotly_chart(fig_response, use_container_width=True)
 
-    if hist_df.empty:
-        st.info("Load response chart will populate once this athlete has historical GPS and force plate rows.")
-    elif "Total Player Load" in hist_df.columns and "Jump Height" in hist_df.columns:
-        response_df = hist_df[["Date_Display", "Total Player Load", "Jump Height"]].copy()
-        response_df["Total Player Load"] = pd.to_numeric(response_df["Total Player Load"], errors="coerce")
-        response_df["Jump Height"] = pd.to_numeric(response_df["Jump Height"], errors="coerce")
-        response_df = response_df.dropna(subset=["Total Player Load", "Jump Height"], how="all")
-
-        if response_df.empty:
-            st.info("Need Total Player Load and/or Jump Height history for this athlete to populate the load response view.")
-        else:
-            fig_response = go.Figure()
-            fig_response.add_trace(go.Bar(
-                x=response_df["Date_Display"],
-                y=response_df["Total Player Load"],
-                name="Total Player Load",
-                marker_color="#500000",
-                opacity=0.85,
-                yaxis="y1"
-            ))
-            fig_response.add_trace(go.Scatter(
-                x=response_df["Date_Display"],
-                y=response_df["Jump Height"],
-                name="Jump Height",
-                mode="lines+markers",
-                line=dict(color="#FFD700", width=4),
-                marker=dict(size=10, color="#FFD700", line=dict(width=2, color="#FFFFFF")),
-                yaxis="y2"
-            ))
-            fig_response.update_layout(
-                height=350,
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="#11141A",
-                font=dict(color="#FFFFFF"),
-                xaxis=dict(gridcolor="#252B36", title="Date"),
-                yaxis=dict(title="Total Player Load", side="left", gridcolor="#252B36"),
-                yaxis2=dict(title="Jump Height", overlaying="y", side="right", showgrid=False),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(t=35, b=35, l=20, r=20),
-                hovermode="x unified"
-            )
-            st.plotly_chart(fig_response, use_container_width=True)
-    else:
-        st.info("Need Total Player Load and Jump Height columns in the historical sheets for this chart.")
-
-# --- PAGE 4: OVERHAULED TARGET TRACKING GRID ---
 # --- PAGE 4: OVERHAULED TARGET TRACKING GRID ---
 elif page == "☀️ Page 4: Summer 2026 Targets":
     st.title("☀️ Summer 2026 Macrocycle Target Board")
