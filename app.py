@@ -593,7 +593,7 @@ st.markdown("<br>", unsafe_allow_html=True)
     # -------------------------------------------------
 left, middle, right = st.columns([1.05, 1.65, 1.15])
 
-```python
+
 left, middle, right = st.columns([1.05, 1.65, 1.15])
 
 with left:
