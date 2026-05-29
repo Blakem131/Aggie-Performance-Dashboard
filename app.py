@@ -305,7 +305,7 @@ if page == "📊 Page 1: Daily Team Monitor":
 
 # --- PAGE 2: POSITIONAL BREAKDOWNS ---
 elif page == "🎯 Page 2: Positional Breakdowns":
-    st.title("🎯 Positional Architecture Performance Tiers")
+    st.title("🎯 Positional Performance")
     st.divider()
     for group in ['Skill', 'Mid', 'Big']:
         st.markdown(f"## **{group.upper()} UNIT LEADERBOARD**")
@@ -315,7 +315,7 @@ elif page == "🎯 Page 2: Positional Breakdowns":
 # --- PAGE 3: MIDNIGHT AGGIE ATHLETE OS ---
 elif page == "👤 Page 3: Athlete Diagnostics":
 
-    st.title("👤 MIDNIGHT AGGIE ATHLETE OS")
+    st.title("Athlete Dashboard")
     st.markdown(f"### High-Density Athlete Performance Dashboard | Date: **{selected_date}**")
     st.divider()
 
