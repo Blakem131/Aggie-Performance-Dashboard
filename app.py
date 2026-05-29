@@ -593,7 +593,7 @@ st.markdown("<br>", unsafe_allow_html=True)
     # -------------------------------------------------
 left, middle, right = st.columns([1.05, 1.65, 1.15])
 
-    with left:
+with left:
         st.markdown("### Readiness Engine")
         st.plotly_chart(build_readiness_gauge(readiness_score), use_container_width=True)
 
@@ -618,7 +618,7 @@ left, middle, right = st.columns([1.05, 1.65, 1.15])
         </div>
         """, unsafe_allow_html=True)
 
-    with middle:
+ with middle:
         st.markdown("### Historical Trend Tracker")
 
         timeline_weeks = [
@@ -695,7 +695,7 @@ left, middle, right = st.columns([1.05, 1.65, 1.15])
 
         st.plotly_chart(fig_trend, use_container_width=True)
 
-    with right:
+  with right:
         st.markdown("### Athletic Profile")
 
         radar_labels = [
@@ -728,14 +728,14 @@ left, middle, right = st.columns([1.05, 1.65, 1.15])
 
     v1, v2, v3 = st.columns(3)
 
-    with v1:
+with v1:
         metric_tile(
             "Bench Press Power",
             f"{bench_power:.0f}",
             "Peak Power Output"
         )
 
-    with v2:
+ with v2:
         metric_tile(
             "Back Squat Velocity",
             f"{squat_velocity:.2f}",
@@ -743,7 +743,7 @@ left, middle, right = st.columns([1.05, 1.65, 1.15])
             "#FFFFFF"
         )
 
-    with v3:
+  with v3:
         metric_tile(
             "Power Clean Output",
             f"{clean_power:.0f}",
