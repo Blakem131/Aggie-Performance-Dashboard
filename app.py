@@ -618,7 +618,7 @@ with left:
         </div>
         """, unsafe_allow_html=True)
 
- with middle:
+with middle:
         st.markdown("### Historical Trend Tracker")
 
         timeline_weeks = [
@@ -695,7 +695,7 @@ with left:
 
         st.plotly_chart(fig_trend, use_container_width=True)
 
-  with right:
+with right:
         st.markdown("### Athletic Profile")
 
         radar_labels = [
@@ -735,7 +735,7 @@ with v1:
             "Peak Power Output"
         )
 
- with v2:
+with v2:
         metric_tile(
             "Back Squat Velocity",
             f"{squat_velocity:.2f}",
@@ -743,7 +743,7 @@ with v1:
             "#FFFFFF"
         )
 
-  with v3:
+with v3:
         metric_tile(
             "Power Clean Output",
             f"{clean_power:.0f}",
@@ -855,7 +855,7 @@ elif page == "☀️ Page 4: Summer 2026 Targets":
         """
 
     row1_c1, row1_c2, row1_c3 = st.columns(3)
-    with row1_c1:
+ with row1_c1:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>🏃 SPEED CAPACITY MODULE</h4>
@@ -866,7 +866,7 @@ elif page == "☀️ Page 4: Summer 2026 Targets":
         </div>
         """, unsafe_allow_html=True)
 
-    with row1_c2:
+ with row1_c2:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>⚡ EXPLOSIVE POWER MODULE</h4>
@@ -877,7 +877,7 @@ elif page == "☀️ Page 4: Summer 2026 Targets":
         </div>
         """, unsafe_allow_html=True)
 
-    with row1_c3:
+ with row1_c3:
         st.markdown(f"""
         <div class="dashboard-tile">
             <h4>🐰 ELASTIC REBOUND RECOIL</h4>
